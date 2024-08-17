@@ -25,10 +25,10 @@ main = do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags
-      target <- guessTarget "/Users/tallyholcombe/Documents/Thesis/hs-to-lean/src/Test.hs" Nothing (Just (Cpp HsSrcFile))
+      target <- guessTarget "src/Test.hs" Nothing (Just (Cpp HsSrcFile))
       setTargets [target]
       load LoadAllTargets
-      let moduleName = takeBaseName "/Users/tallyholcombe/Documents/Thesis/hs-to-lean/src/Test.hs"
+      let moduleName = takeBaseName "src/Test.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
       let ast = ppr $ pm_parsed_source parsedModule
