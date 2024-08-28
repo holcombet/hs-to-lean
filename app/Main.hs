@@ -33,7 +33,8 @@ main = do
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
       let ast = pm_parsed_source parsedModule
-      liftIO $ putStrLn $ gshow ast
+      let prettyAst = prettyPrint $ gshow ast
+      liftIO $ putStrLn prettyAst
 
 
 -- doesnt work --
