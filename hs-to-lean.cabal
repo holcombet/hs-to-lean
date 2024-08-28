@@ -57,3 +57,4 @@ executable hs-to-lean
 
     hs-source-dirs:   app
     default-language: Haskell2010
+syb
