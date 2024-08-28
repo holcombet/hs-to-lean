@@ -31,8 +31,8 @@ main = do
       let moduleName = takeBaseName "src/Test.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
-      let ast = ppr $ pm_parsed_source parsedModule
-      liftIO $ putStrLn $ showSDocUnsafe ast
+      let ast = pm_parsed_source parsedModule
+      liftIO $ putStrLn $ show ast
 
 
 -- doesnt work --
