@@ -53,7 +53,8 @@ executable hs-to-lean
         ghc,
         ghc-lib-parser,
         ghc-paths,
-        filepath
+        filepath,
+        syb
         
 
     hs-source-dirs:   app
