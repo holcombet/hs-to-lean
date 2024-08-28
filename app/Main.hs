@@ -32,7 +32,7 @@ main = do
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
       let ast = ppr $ pm_parsed_source parsedModule
-      liftIO $ putStrLn $ showSDocUnsafe ast
+      liftIO $ outputSDoc_ ast
 
 
 -- doesnt work --
