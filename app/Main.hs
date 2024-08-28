@@ -23,7 +23,9 @@ prettyPrint = unlines . snd . foldl processChar (0, []) where
     processChar (indent, lines) char
         | char == '{' = (indent + 1, lines ++ [replicate indent ' ' ++ [char]])
         | char == '}' = (indent - 1, lines ++ [replicate (indent - 1) ' ' ++ [char]])
-        | otherwise = (indent, init lines ++ [last lines ++ [char]])
+        | otherwise = if null lines
+                      then (indent, [[char]])
+                      else (indent, init lines ++ [last lines ++ [char]])
         
 -- runs but doesn't parse --
 main :: IO ()
