@@ -52,6 +52,7 @@ prettyHsDecl = \case
   ValD _ decl -> prettyPrint $ gshow decl
   SigD _ decl -> case decl of
     TypeSig _ names typ -> gshow (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ gshow typ
+    HsWC _ _ -> "blaaaaaaaaaaaaaa"
     _ -> "Not implemented"
   
   _ -> "Not implemented"
