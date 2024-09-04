@@ -1,4 +1,4 @@
-{-# LANGUAGE PackageImports, CPP #-}
+{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase #-}
 
 
 module Main where
@@ -14,9 +14,10 @@ import System.FilePath (takeBaseName)
 import System.IO (writeFile)
 import "ghc" GHC.Driver.Session -- ( defaultFatalMessager, defaultFlushOut )
 import Control.Monad.IO.Class
-import "ghc" GHC.Driver.Phases (Phase(Cpp))  
+import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
-import "ghc" GHC.Unit.Module 
+import "ghc" GHC.Unit.Module
+import "ghc" GHC.Plugins
 
 prettyPrint :: String -> String
 prettyPrint = unlines . snd . foldl processChar (0, []) where
@@ -26,7 +27,7 @@ prettyPrint = unlines . snd . foldl processChar (0, []) where
         | otherwise = if null lines
                       then (indent, [[char]])
                       else (indent, init lines ++ [last lines ++ [char]])
-        
+
 -- runs but doesn't parse --
 main :: IO ()
 main = do
@@ -40,7 +41,20 @@ main = do
       let moduleName = takeBaseName "src/Test.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
-      let ast = pm_parsed_source parsedModule
-      let prettyAst = prettyPrint $ gshow ast
-      liftIO $ putStrLn prettyAst
+      -- let ast = pm_parsed_source parsedModule
+      let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ pm_parsed_source parsedModule
+      -- let prettyAst = prettyPrint $ gshow ast
+      let prettyAst = gshow ast -- write your own gshow
+      liftIO $ mapM_ (putStrLn . prettyHsDecl) ast
+
+prettyHsDecl :: HsDecl GhcPs -> String
+prettyHsDecl = \case
+  ValD _ decl -> prettyPrint $ gshow decl
+  SigD _ decl -> case decl of
+    TypeSig _ names typ -> prettyPrint $ gshow (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ gshow typ
+    _ -> "Not implemented"
+  
+  _ -> "Not implemented"
+
+
 

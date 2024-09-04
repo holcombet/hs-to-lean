@@ -1,2 +1,4 @@
 dist-newstyle
 .aider*
+.DS_Store
+output.txt
