@@ -62,7 +62,7 @@ prettyLHsSigWcType = \case
   _ -> "Not implemented"
 
 prettyLHsSigType :: LHsSigType GhcPs -> String
-prettyLHsSigType arg = prettyHsSigType (( f . unXRec @(GhcPass 'Parsed)) arg)
+prettyLHsSigType arg = prettyHsSigType (unXRec @(GhcPass 'Parsed) arg)
 
 
 prettyHsSigType :: LHsSigType GhcPs -> String
