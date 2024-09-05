@@ -72,7 +72,7 @@ prettyLHsType arg = prettyHsType (unXRec @(GhcPass 'Parsed) arg)
 prettyHsType :: HsType GhcPs -> String
 prettyHsType = \case
   HsFunTy _ _ arg1 arg2 -> prettyLHsType arg1 ++ " -> " ++ prettyLHsType arg2
-  HsTyVar _ _ typ -> typ
+  HsTyVar _ _ typ -> occNameString . occName . unLoc $ typ
   _ -> "Not implemented"
 
 
