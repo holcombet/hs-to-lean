@@ -53,20 +53,25 @@ prettyHsDecl = \case
   SigD _ decl -> case decl of
     TypeSig _ names typ -> gshow (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
     _ -> "Not implemented"
-  
   _ -> "Not implemented"
 
 prettyLHsSigWcType :: LHsSigWcType GhcPs -> String
 prettyLHsSigWcType = \case
   HsWC ext body -> prettyLHsSigType body
-  _ -> "Not implemented"
 
 prettyLHsSigType :: LHsSigType GhcPs -> String
 prettyLHsSigType arg = prettyHsSigType (unXRec @(GhcPass 'Parsed) arg)
 
-
 prettyHsSigType :: HsSigType GhcPs -> String
 prettyHsSigType = \case
+  HsSig ext bndrs body -> prettyLHsType body
+
+prettyLHsType :: LHsType GhcPs -> String
+prettyLHsType arg = prettyHsType (unXRec @(GhcPass 'Parsed) arg)
+
+prettyHsType :: HsType GhcPs -> String
+prettyHsType = \case
+  HsFunTy _ _ arg1 arg2 -> prettyLHsType arg1 ++ " -> " ++ prettyLHsType arg2
   _ -> "Not implemented"
 
 
