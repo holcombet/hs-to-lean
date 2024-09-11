@@ -18,6 +18,8 @@ import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
 import "ghc" GHC.Plugins
+import Data.String (String)
+import GHC (UnXRec(unXRec))
 
 prettyPrint :: String -> String
 prettyPrint = unlines . snd . foldl processChar (0, []) where
@@ -49,7 +51,11 @@ main = do
 
 prettyHsDecl :: HsDecl GhcPs -> String
 prettyHsDecl = \case
-  ValD _ decl -> prettyPrint $ gshow decl
+  -- ValD _ decl -> prettyPrint $ gshow decl 
+  ValD _ decl -> case decl of 
+    -- FunBind takes (XFunBind GhcPs GhcPs) (LIdp GhcPs) (MatchGroup GhcPs (LHsExpr GhcPs)) ([CoreTickish])
+    FunBind _ fun_id matches  _ -> gshow (( occNameString . occName . unXRec @(GhcPass 'Parsed) ) fun_id) ++ " = " ++  prettyMatchGroup matches
+    _ -> prettyPrint $ gshow decl
   SigD _ decl -> case decl of
     TypeSig _ names typ -> gshow (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
     _ -> "Not implemented"
@@ -75,4 +81,38 @@ prettyHsType = \case
   HsTyVar _ _ typ -> occNameString . occName . unLoc $ typ
   _ -> "Not implemented"
 
+prettyMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs) -> String
+prettyMatchGroup = \case
+  MG ext (L _ matches) _ -> unlines $ map prettyLMatch matches
 
+prettyLMatch :: LMatch GhcPs (LHsExpr GhcPs) -> String
+prettyLMatch (L _ match) = case match of 
+  -- pats :: [LPat p]
+  -- body :: GRHSs p body
+  Match _ _ pats body -> unwords (map prettyPat pats) ++ " -> " ++ prettyGRHSs body
+  -- _ -> "Not implemented"
+
+prettyPat :: LPat GhcPs -> String
+prettyPat (L _ pat) = case pat of
+  VarPat _ typ -> occNameString . occName . unLoc $ typ
+  _ -> "Not implemented"
+
+prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
+prettyGRHSs (GRHSs _ grhss _) = unlines $ map prettyGRHS grhss
+
+prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
+prettyGRHS (L _ (GRHS _ _ body)) = prettyLHsExpr body
+
+prettyLHsExpr :: LHsExpr GhcPs -> String
+prettyLHsExpr expr = prettyHsExpr (unXRec @(GhcPass 'Parsed) expr)
+-- prettyLHsExpr (L _ body) = 
+
+prettyHsExpr :: HsExpr GhcPs -> String 
+prettyHsExpr = \case
+  HsVar _ name -> occNameString . occName . unLoc $ name
+  _ -> "Not implemented"
+
+
+-- prettyLMatch :: XRec GhcPs [LMatch GhcPs (LHsExpr GhcPs)] -> String
+-- prettyLMatch = \case
+--   LM xrec lm -> 
