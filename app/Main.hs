@@ -1,4 +1,4 @@
-{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase #-}
+{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns #-}
 
 
 module Main where
@@ -17,9 +17,12 @@ import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
-import "ghc" GHC.Plugins
+import "ghc" GHC.Plugins ( occNameString, HasOccName(occName) )
 import Data.String (String)
-import GHC (UnXRec(unXRec))
+import Data.List (intercalate)
+import "ghc" GHC.Types.SourceText
+-- import GHC (UnXRec(unXRec), ParsedModule (pm_parsed_source))
+-- import Data.Maybe (Maybe(Nothing))
 
 prettyPrint :: String -> String
 prettyPrint = unlines . snd . foldl processChar (0, []) where
@@ -44,49 +47,51 @@ main = do
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
       -- let ast = pm_parsed_source parsedModule
+      let astMod = hsmodName $ unLoc $ pm_parsed_source parsedModule
+      
       let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ pm_parsed_source parsedModule
-      -- let prettyAst = prettyPrint $ gshow ast
+      let prettyAstMod = gshow astMod
       let prettyAst = gshow ast -- write your own gshow
+      liftIO $ (putStrLn . prettyHsModuleName) astMod
       liftIO $ mapM_ (putStrLn . prettyHsDecl) ast
 
 
-{-
-ValD (value)
-  FunBind (function-like binding) 
-  PatBind (pattern binding): _ lpat HsMultAnn (GRHSs idR (LHsExpr idR))
+prettyHsModuleName :: Maybe (LocatedA ModuleName) -> String
+prettyHsModuleName Nothing = ""
+prettyHsModuleName (Just (L _ moduleName)) =  "module " ++ moduleNameString moduleName ++ " where"
 
 
-
-
--}
 prettyHsDecl :: HsDecl GhcPs -> String
 prettyHsDecl = \case
-  -- ValD _ decl -> prettyPrint $ gshow decl 
   TyClD _ decl -> case decl of
     SynDecl _ name tyVar fix rhs -> "type " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name  ++ " = " ++ prettyLHsType rhs
+    -- missing:
+    -- DataDecl
+    -- ClassDecl
     _ -> "Not implemented"
   ValD _ decl -> case decl of 
-    -- FunBind does the function binding for fun_id ::  
-    -- FunBind _ fun_id matches  _ -> gshow (( occNameString . occName . unXRec @(GhcPass 'Parsed) ) fun_id) ++ " = " ++  prettyMatchGroup matches
-    -- I feel like theres something wrong but it's better than line 70. Doesn't account for cases when function binding uses -> instead of =
+    -- something's wrong here... function name not binding if function more than 1 line
     FunBind _ name matches _ -> 
-      let funName = gshow ((occNameString . occName . unXRec @(GhcPass 'Parsed)) name ) 
-          matchStrings = map (\(L _ (Match _ _ pats body)) ->
-            let argStrings = unwords (map prettyPat pats)
+      let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
+          matchStrings = map (\(L _ (Match _ c pats body)) ->
+            let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
                 bodyString = prettyGRHSs body
             in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
-      in funName ++ " " ++ unlines matchStrings
+      -- in funName ++ " " ++ unlines matchStrings
+      in  unlines matchStrings
     PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
     VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
     -- PatSynBind _ patSyn -> prettyPatSynBind patSyn
     _ -> prettyPrint $ gshow decl
   SigD _ decl -> case decl of
-    TypeSig _ names typ -> gshow (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
+    TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
     PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
     _ -> "Not implemented"
   _ -> "Not implemented"
 
-
+-- prettyHsMatchContext :: HsMatchContext GhcPs -> String
+-- prettyHsMatchContext context = case context of
+--   FunRhs {mc_fun = name}
 
 prettyLHsSigWcType :: LHsSigWcType GhcPs -> String
 prettyLHsSigWcType = \case
@@ -138,8 +143,8 @@ HsType:
 -}
 prettyHsType :: HsType GhcPs -> String
 prettyHsType = \case
-  HsFunTy _ _ arg1 arg2 -> prettyLHsType arg1 ++ " -> " ++ prettyLHsType arg2
-  HsTyVar _ _ typ -> occNameString . occName . unLoc $ typ
+  HsFunTy _ _ arg1 arg2 -> prettyLHsType arg1 ++ " -> " ++ prettyLHsType arg2   -- for SigTyp (function signature) I think
+  HsTyVar _ _ typ -> occNameString . occName . unLoc $ typ    -- Type Variables (Int -> Int)
   HsAppTy _ typ1 typ2 -> prettyLHsType typ1 ++ " " ++ prettyLHsType typ2
   HsParTy _ typ -> prettyLHsType typ
   HsOpTy _ _ typ1 id typ2 -> prettyLHsType typ1 ++ (occNameString . occName . unLoc $ id) ++ prettyLHsType typ2
@@ -161,10 +166,13 @@ prettyPat :: LPat GhcPs -> String
 prettyPat (L _ pat) = case pat of
   VarPat _ typ -> occNameString . occName . unLoc $ typ
   LitPat _ pat -> prettyHsLit pat
+  WildPat _ -> "_"    -- for wildcards
+  ListPat _ pats -> "[" ++ intercalate "," (map prettyPat pats) ++ "]"    -- for list patterns
+  NPat _ lit _ _ ->  prettyOverLit (unXRec @(GhcPass 'Parsed) lit)    -- for n (0)
   _ -> "Not implemented"
 
 prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
-prettyGRHSs (GRHSs _ grhss _) = unlines $ map prettyGRHS grhss
+prettyGRHSs (GRHSs _ grhss _) = unwords $ map prettyGRHS grhss
 
 prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
 prettyGRHS (L _ (GRHS _ _ body)) = prettyLHsExpr body
@@ -172,6 +180,12 @@ prettyGRHS (L _ (GRHS _ _ body)) = prettyLHsExpr body
 prettyLHsExpr :: LHsExpr GhcPs -> String
 prettyLHsExpr expr = prettyHsExpr (unXRec @(GhcPass 'Parsed) expr)
 -- prettyLHsExpr (L _ body) = 
+
+prettyOverLit :: HsOverLit GhcPs -> String
+prettyOverLit (OverLit _ val) = case val of
+  HsIntegral (IL _ _ i) -> gshow i
+  HsFractional f -> gshow f
+  HsIsString _ s -> gshow s
 
 
 {-
@@ -182,9 +196,10 @@ prettyHsExpr :: HsExpr GhcPs -> String
 prettyHsExpr = \case
   HsVar _ name -> occNameString . occName . unLoc $ name   -- variable names
   HsLit _ lit -> prettyHsLit lit  -- for literals in code (ints, strings, etc.)
-  HsApp _ expr1 expr2 -> prettyHsExpr (unLoc expr1) ++ " " ++ prettyHsExpr (unLoc expr2) -- apply a function to an argument (i.e. f x)
+  HsApp _ expr1 expr2 -> prettyHsExpr (unLoc expr1) ++ " " ++ prettyHsExpr (unLoc expr2) -- apply a function to an argument (i.e. f x) -- recursiveAdd n (...)
   OpApp _ expr1 op expr2 -> prettyHsExpr (unLoc expr1) ++ " " ++ prettyHsExpr (unLoc op) ++ " " ++ prettyHsExpr (unLoc expr2) -- for operaor expr (i.e. n + m)
   HsPar _ tok1 exp tok2 -> "( " ++ prettyLHsExpr exp ++ " )"  -- parenthesized expressions (i.e. m - 1)
+  HsOverLit _ lit -> prettyOverLit lit    -- adds the literals in function body (1 + recursiveAdd n (m - 1))
   _ -> "Not implemented"
 
 
@@ -192,10 +207,10 @@ prettyHsLit :: HsLit GhcPs -> String
 prettyHsLit = \case
   HsChar _ char -> gshow char
   HsString _ str -> gshow str
-  HsInt _ int -> gshow int   -- might be wrong
+  HsInt _ (IL _ _ int) -> gshow int   -- might be wrong
   HsInteger _ int _ -> gshow int
   -- there are more, but this is it for now
-  _ -> "Not Implemented"
+  _ -> "Not implemented"  -- not the missing piece ( the 1 )
 
 
 -- prettyLMatch :: XRec GhcPs [LMatch GhcPs (LHsExpr GhcPs)] -> String
