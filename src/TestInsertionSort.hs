@@ -1,13 +1,11 @@
 module TestInsertionSort where
 
-insert_sorted :: [Int] -> Int -> [Int]
-insert_sorted = \list -> \v ->
-    case list of 
-        x:xs | v>x -> x:insert_sorted xs v
-        _ -> v:list
+insert :: Int -> [Int] -> [Int]
+insert x [] = [x]
+insert x (y:ys) = if x < y 
+                 then x:y:ys 
+         else y : insert x ys
 
-insertion_sort :: [Int] -> [Int]
-insertion_sort = \list ->
-    case list of 
-        [] -> []
-        x:xs -> insert_sorted (insertion_sort xs) x
+insertionSort :: [Int] -> [Int]
+insertionSort [x] = [x]
+insertionSort (x:xs) = insert x (insertionSort xs)
