@@ -154,6 +154,7 @@ prettyHsType = \case
   HsAppTy _ typ1 typ2 -> prettyLHsType typ1 ++ " " ++ prettyLHsType typ2
   HsParTy _ typ -> prettyLHsType typ
   HsOpTy _ _ typ1 id typ2 -> prettyLHsType typ1 ++ (occNameString . occName . unLoc $ id) ++ prettyLHsType typ2
+  HsListTy _ typ -> "[" ++ prettyLHsType typ ++ "]"   -- list type
   _ -> "Not implemented" 
 
 prettyMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs) -> String
@@ -175,6 +176,7 @@ prettyPat (L _ pat) = case pat of
   WildPat _ -> "_"    -- for wildcards
   ListPat _ pats -> "[" ++ intercalate "," (map prettyPat pats) ++ "]"    -- for list patterns
   NPat _ lit _ _ ->  prettyOverLit (unXRec @(GhcPass 'Parsed) lit)    -- for n (0)
+  ConPat _ con details -> (occNameString . occName . unLoc $ con) ++ " " ++ unwords (map prettyPat (prettyHsConPatDetails details)) 
   _ -> "Not implemented"
 
 prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
@@ -194,6 +196,15 @@ prettyOverLit (OverLit _ val) = case val of
   HsIsString _ s -> gshow s
 
 
+prettyHsConPatDetails :: HsConPatDetails GhcPs -> [LPat GhcPs]
+prettyHsConPatDetails details = case details of
+  PrefixCon tyarg arg -> arg
+  InfixCon arg1 arg2 -> [arg1, arg2]
+  -- RecCon (HsRecFields fields _)  -> 
+
+
+
+
 {-
 HsVar:    _ LIdP
 HsLit:    _ HsLit
@@ -206,6 +217,8 @@ prettyHsExpr = \case
   OpApp _ expr1 op expr2 -> prettyHsExpr (unLoc expr1) ++ " " ++ prettyHsExpr (unLoc op) ++ " " ++ prettyHsExpr (unLoc expr2) -- for operaor expr (i.e. n + m)
   HsPar _ tok1 exp tok2 -> "( " ++ prettyLHsExpr exp ++ " )"  -- parenthesized expressions (i.e. m - 1)
   HsOverLit _ lit -> prettyOverLit lit    -- adds the literals in function body (1 + recursiveAdd n (m - 1))
+  ExplicitList _ exprs -> "[" ++ intercalate  ", " (map prettyLHsExpr exprs) ++ "]"
+  -- HsCase _ expr matches -> 
   _ -> "Not implemented"
 
 
