@@ -33,17 +33,23 @@ prettyPrint = unlines . snd . foldl processChar (0, []) where
                       then (indent, [[char]])
                       else (indent, init lines ++ [last lines ++ [char]])
 
+
+
 -- runs but doesn't parse --
 main :: IO ()
 main = do
+  -- get targetFile from cmd line
+  
+
+
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags
-      target <- guessTarget "src/Test.hs" Nothing (Just (Cpp HsSrcFile))
+      target <- guessTarget "src/TestInsertionSort.hs" Nothing (Just (Cpp HsSrcFile))
       setTargets [target]
       load LoadAllTargets
-      let moduleName = takeBaseName "src/Test.hs"
+      let moduleName = takeBaseName "src/TestInsertionSort.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
       -- let ast = pm_parsed_source parsedModule
@@ -212,7 +218,3 @@ prettyHsLit = \case
   -- there are more, but this is it for now
   _ -> "Not implemented"  -- not the missing piece ( the 1 )
 
-
--- prettyLMatch :: XRec GhcPs [LMatch GhcPs (LHsExpr GhcPs)] -> String
--- prettyLMatch = \case
---   LM xrec lm -> 
