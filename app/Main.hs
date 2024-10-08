@@ -218,6 +218,9 @@ prettyHsExpr = \case
   HsPar _ tok1 exp tok2 -> "( " ++ prettyLHsExpr exp ++ " )"  -- parenthesized expressions (i.e. m - 1)
   HsOverLit _ lit -> prettyOverLit lit    -- adds the literals in function body (1 + recursiveAdd n (m - 1))
   ExplicitList _ exprs -> "[" ++ intercalate  ", " (map prettyLHsExpr exprs) ++ "]"
+  HsIf _ exp1 exp2 exp3 -> "if " ++ prettyLHsExpr exp1 ++
+                           " then " ++ prettyLHsExpr exp2 ++
+                           " else " ++ prettyLHsExpr exp3
   -- HsCase _ expr matches -> 
   _ -> "Not implemented"
 
