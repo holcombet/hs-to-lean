@@ -11,5 +11,7 @@ Tested with ghc 9.4.8
 In the parent directory (hs-to-lean), run the program 
 ```
 cabal build
-cabal run > "output.txt"
+cabal run 
 ```
+
+**NOTE:** At present, the program is designed to output the translated Lean code into a file named "result.txt" in src.
