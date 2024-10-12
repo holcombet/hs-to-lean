@@ -176,10 +176,19 @@ prettyPat (L _ pat) = case pat of
   VarPat _ typ -> occNameString . occName . unLoc $ typ
   LitPat _ pat -> prettyHsLit pat
   WildPat _ -> "_"    -- for wildcards
-  ListPat _ pats -> "[" ++ intercalate "," (map prettyPat pats) ++ "]"    -- for list patterns
+  ListPat _ pats -> "[" ++ intercalate "," (map prettyPat pats) ++ "]"    -- for list patterns, will have to change to : pattern for lean
   NPat _ lit _ _ ->  prettyOverLit (unXRec @(GhcPass 'Parsed) lit)    -- for n (0)
-  -- ParPat _ pat -> 
-  ConPat _ con details -> (occNameString . occName . unLoc $ con) ++ " " ++ unwords (map prettyPat (prettyHsConPatDetails details)) 
+  -- ParPat for (x : xs)
+  ParPat _ tokLeft pat tokRight -> "(" ++ prettyPat pat ++ ")"
+  -- ConPat _ (L _ name) details | occNameString (occName name) == ":" -> occNameString (occName name) ++ " " ++ unwords (map prettyPat (prettyHsConPatDetails details)) 
+  ConPat _ (L _ name) details ->
+    let conName = occNameString . occName $ name
+        patDetails = prettyHsConPatDetails details
+    in case details of
+      PrefixCon _ _ -> conName ++ " " ++ unwords patDetails 
+      InfixCon _ _ -> intercalate (" " ++ conName ++ " ") patDetails    -- for : lists (i.e. (x : xs))
+      -- RecCon _ -> conName ++ " { " ++ intercalate ", " patDetails ++ " }"
+
   _ -> "Not implemented"
 
 prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
@@ -199,11 +208,11 @@ prettyOverLit (OverLit _ val) = case val of
   HsIsString _ s -> gshow s
 
 
-prettyHsConPatDetails :: HsConPatDetails GhcPs -> [LPat GhcPs]
+prettyHsConPatDetails :: HsConPatDetails GhcPs -> [String]
 prettyHsConPatDetails details = case details of
-  PrefixCon tyarg arg -> arg
-  InfixCon arg1 arg2 -> [arg1, arg2]
-  -- RecCon (HsRecFields fields _)  -> 
+  PrefixCon tyarg arg -> map prettyPat arg
+  InfixCon arg1 arg2 -> [prettyPat arg1, prettyPat arg2]
+  -- RecCon (HsRecFields fields _)  ->  map (\(L _ (HsRecFieldCon (L _ name) pat _ _)) -> (occNameString . occName $ name) ++ " = " ++ prettyPat pat) fields
 
 
 
