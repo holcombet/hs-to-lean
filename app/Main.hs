@@ -56,6 +56,7 @@ main = do
       parsedModule <- GHC.parseModule modSum
 
       let astForLean = pm_parsed_source parsedModule
+      liftIO $ translateToLean astForLean
       -- TranslateHaskell.translateToLean astForLean
       -- translateToLean astForLean
       -- liftIO $ putStrLn $ gshow astForLean

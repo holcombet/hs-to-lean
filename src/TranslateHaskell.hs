@@ -23,6 +23,6 @@ import "ghc" GHC.Types.SourceText
 
 
 translateToLean :: ParsedSource -> IO()
-translateToLean ast = liftIO $ writeFile "result.txt" (gshow ast)
+translateToLean ast = liftIO $ writeFile "src/result.txt" (gshow ast)
 
 
