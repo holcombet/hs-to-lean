@@ -11,5 +11,5 @@ Tested with ghc 9.4.8
 In the parent directory (hs-to-lean), run the program 
 ```
 cabal build
-cabal run
+cabal run > "output.txt"
 ```
