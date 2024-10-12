@@ -176,6 +176,7 @@ prettyPat (L _ pat) = case pat of
   WildPat _ -> "_"    -- for wildcards
   ListPat _ pats -> "[" ++ intercalate "," (map prettyPat pats) ++ "]"    -- for list patterns
   NPat _ lit _ _ ->  prettyOverLit (unXRec @(GhcPass 'Parsed) lit)    -- for n (0)
+  -- ParPat _ pat -> 
   ConPat _ con details -> (occNameString . occName . unLoc $ con) ++ " " ++ unwords (map prettyPat (prettyHsConPatDetails details)) 
   _ -> "Not implemented"
 
