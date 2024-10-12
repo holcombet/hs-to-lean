@@ -52,7 +52,9 @@ main = do
       let moduleName = takeBaseName "src/TestInsertionSort.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
+
       -- let ast = pm_parsed_source parsedModule
+      -- liftIO $ putStrLn $ gshow ast
       let astMod = hsmodName $ unLoc $ pm_parsed_source parsedModule
       
       let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ pm_parsed_source parsedModule
