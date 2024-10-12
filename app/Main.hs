@@ -21,6 +21,8 @@ import "ghc" GHC.Plugins ( occNameString, HasOccName(occName) )
 import Data.String (String)
 import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
+
+import TranslateHaskell (translateToLean)
 -- import GHC (UnXRec(unXRec), ParsedModule (pm_parsed_source))
 -- import Data.Maybe (Maybe(Nothing))
 
@@ -53,10 +55,13 @@ main = do
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
 
-      -- let ast = pm_parsed_source parsedModule
-      -- liftIO $ putStrLn $ gshow ast
+      let astForLean = pm_parsed_source parsedModule
+      -- TranslateHaskell.translateToLean astForLean
+      -- translateToLean astForLean
+      -- liftIO $ putStrLn $ gshow astForLean
+
+      -- Haskell ast to Haskell
       let astMod = hsmodName $ unLoc $ pm_parsed_source parsedModule
-      
       let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ pm_parsed_source parsedModule
       let prettyAstMod = gshow astMod
       let prettyAst = gshow ast -- write your own gshow
