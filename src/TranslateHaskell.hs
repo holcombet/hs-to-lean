@@ -48,11 +48,39 @@ prettyLeanDecl = \case
         VarBind _ var rhs -> "Not implemented"      -- requires LHsExpr
         _ -> "Not implemented"
     SigD _ decl -> case decl of
-        TypeSig _ names typ -> "def " ++ unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " : " ++ "Not implemented"    -- requires LHsSigWcType
+        TypeSig _ names typ -> "def " ++ unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " : " ++ prettyLLeanSigWcType typ    -- requires LHsSigWcType
         PatSynSig _ names typ -> "def " ++ unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " : " ++ "Not implemented"  -- requires LHsSigType
         _ -> "Not implemented"
     _ -> "Not implemented"
 
 
+prettyLLeanSigWcType :: LHsSigWcType GhcPs -> String
+prettyLLeanSigWcType = \case
+    HsWC ext body -> prettyLLeanSigType body
+
+prettyLLeanSigType :: LHsSigType GhcPs -> String
+prettyLLeanSigType arg = prettyLeanSigType (unXRec @(GhcPass 'Parsed) arg)
+
+
+prettyLeanSigType :: HsSigType GhcPs -> String
+prettyLeanSigType = \case
+    HsSig ext bndrs body -> prettyLLeanType body        -- requires HsType
+
+prettyLLeanType :: LHsType GhcPs -> String
+prettyLLeanType arg = prettyLeanType (unXRec @(GhcPass 'Parsed) arg)
+
+
+prettyLeanType :: HsType GhcPs -> String
+prettyLeanType = \case
+    HsFunTy _ _ arg1 arg2 -> prettyLLeanType arg1 ++ " -> " ++ prettyLLeanType arg2     -- for SigType
+    HsTyVar _ _ typ  
+        | typVar == "Int" -> "Nat"
+        | otherwise -> "Not implemented"
+        where typVar = occNameString . occName . unLoc $ typ      -- getting type
+    HsListTy _ typ -> "List " ++ prettyLLeanType typ
+    HsAppTy _ typ1 typ2 -> "Not implemented"     -- 
+    HsParTy _ typ -> "Not implemented"
+    HsOpTy _ _ typ1 id typ2 -> "Not implemented"
+    _ -> "Not implemented"
 
 main = putStrLn "Done."
