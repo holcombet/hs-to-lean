@@ -20,4 +20,4 @@ cabal run
 ## Relevant Developmental Notes:
 
 Current limitations:
-* translation of Haskell functions into Lean are implemented for only pattern matching functions (in FunBind, src/TranslateHaskell.hs) and does not account for functions that do not require (recursive) pattern matching
+* translation of Haskell functions into Lean are implemented for only pattern matching functions (in FunBind, src/TranslateHaskell.hs) and does not account for functions that do not require direct pattern matching
