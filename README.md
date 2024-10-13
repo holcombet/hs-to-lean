@@ -15,3 +15,9 @@ cabal run
 ```
 
 **NOTE:** At present, the program is designed to output the translated Lean code into a file named "result.txt" in src.
+
+
+## Relevant Developmental Notes:
+
+Current limitations:
+* translation of Haskell functions into Lean are implemented for only pattern matching functions (in FunBind, src/TranslateHaskell.hs) and does not account for functions that do not require (recursive) pattern matching
