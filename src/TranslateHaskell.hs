@@ -139,7 +139,8 @@ prettyLeanExpr = \case
     HsVar _ name -> occNameString . occName . unLoc $ name      -- variable names
     HsLit _ lit -> "Not implemented"    -- requires HsLit
     HsApp _ exp1 exp2 -> prettyLeanExpr (unLoc exp1) ++ " " ++ prettyLeanExpr (unLoc exp2)  -- function application to arguments
-    OpApp _ exp1 op exp2 -> prettyLeanExpr (unLoc exp1) ++ " " ++ prettyLeanExpr (unLoc op) ++ " " ++ prettyLeanExpr (unLoc exp2)   -- operators
+    OpApp _ exp1 op exp2 ->  prettyLeanExpr (unLoc exp1) ++ " " ++ prettyLeanExpr (unLoc op) ++ " " ++ prettyLeanExpr (unLoc exp2)   -- operators 
+        -- TODO: account for : denoted lists to use :: for lean lists
     HsPar _ tok1 exp tok2 -> "( " ++ prettyLLeanExpr exp ++ " )"
     HsOverLit _ lit -> prettyLeanOverLit lit
     ExplicitList _ exprs -> "[" ++ intercalate ", " (map prettyLLeanExpr exprs) ++ "]"
