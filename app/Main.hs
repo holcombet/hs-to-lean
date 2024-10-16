@@ -37,7 +37,6 @@ prettyPrint = unlines . snd . foldl processChar (0, []) where
 
 
 
--- runs but doesn't parse --
 main :: IO ()
 main = do
   -- get targetFile from cmd line
