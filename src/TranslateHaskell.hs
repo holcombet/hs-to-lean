@@ -26,9 +26,9 @@ translateToLean :: ParsedSource -> IO()
 translateToLean ast = do
     let parsedAst =  map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ ast
 
+    -- TODO: Write translation to .lean file (in LEAN project)
     liftIO $ writeFile "src/result.txt" (unlines $ map prettyLeanDecl parsedAst)
 
--- translateToLean ast = 
 
 prettyLeanDecl :: HsDecl GhcPs -> String
 prettyLeanDecl = \case
@@ -36,16 +36,15 @@ prettyLeanDecl = \case
         SynDecl _ name tyVar fix rhs -> "Not implemented"
         _ -> "Not implemented"
     ValD _ decl -> case decl of
-        FunBind _ name matches _ -> --"Not implemented\n"   -- requires Pat and GRHSs 
-                                                          -- NOTE: remove newline 
+        FunBind _ name matches _ -> 
             let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
                 matchStrings = map (\(L _ (Match _ c pats body)) ->
                     let argStrings = "\t| " ++  intercalate ", " (map prettyLeanPat pats)
-                        bodyString = prettyLeanGRHSs body -- prettyLeanGRHSs body
+                        bodyString = prettyLeanGRHSs body
                     in argStrings ++ " => " ++ bodyString) (unLoc $ mg_alts matches)
             in unlines matchStrings
-        PatBind _ pat rhs _ -> prettyLeanPat pat ++ " = " ++ prettyLeanGRHSs rhs    -- requires Pat
-        VarBind _ var rhs -> gshow var ++ " = " ++ prettyLLeanExpr rhs      -- requires LHsExpr
+        PatBind _ pat rhs _ -> prettyLeanPat pat ++ " = " ++ prettyLeanGRHSs rhs  
+        VarBind _ var rhs -> gshow var ++ " = " ++ prettyLLeanExpr rhs    
         _ -> "Not implemented"
     SigD _ decl -> case decl of
         TypeSig _ names typ -> "def " ++ unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " : " ++ prettyLLeanSigWcType typ    -- requires LHsSigWcType
@@ -64,7 +63,7 @@ prettyLLeanSigType arg = prettyLeanSigType (unXRec @(GhcPass 'Parsed) arg)
 
 prettyLeanSigType :: HsSigType GhcPs -> String
 prettyLeanSigType = \case
-    HsSig ext bndrs body -> prettyLLeanType body        -- requires HsType
+    HsSig ext bndrs body -> prettyLLeanType body       
 
 prettyLLeanType :: LHsType GhcPs -> String
 prettyLLeanType arg = prettyLeanType (unXRec @(GhcPass 'Parsed) arg)
@@ -72,12 +71,14 @@ prettyLLeanType arg = prettyLeanType (unXRec @(GhcPass 'Parsed) arg)
 
 prettyLeanType :: HsType GhcPs -> String
 prettyLeanType = \case
-    HsFunTy _ _ arg1 arg2 -> prettyLLeanType arg1 ++ " -> " ++ prettyLLeanType arg2     -- for SigType
+    HsFunTy _ _ arg1 arg2 -> prettyLLeanType arg1 ++ " -> " ++ prettyLLeanType arg2    
     HsTyVar _ _ typ  
         | typVar == "Int" -> "Nat"
+        -- TODO: add pattern matching for other types (?)
         | otherwise -> "Not implemented"
         where typVar = occNameString . occName . unLoc $ typ      -- getting type
     HsListTy _ typ -> "List " ++ prettyLLeanType typ
+    -- TODO: implement constructors
     HsAppTy _ typ1 typ2 -> "Not implemented"     -- 
     HsParTy _ typ -> "Not implemented"
     HsOpTy _ _ typ1 id typ2 -> "Not implemented"
@@ -94,10 +95,10 @@ prettyLLeanMatch (L _ match) = case match of
 
 prettyLeanPat :: LPat GhcPs -> String
 prettyLeanPat (L _ pat) = case pat of
-    VarPat _ typ -> occNameString . occName . unLoc $ typ   -- might have to implement a renamer down the line...insert
+    VarPat _ typ -> occNameString . occName . unLoc $ typ   
     LitPat _ pat -> "Not implemented"       -- requires HsLit
-    ListPat _ pats -> "[" ++ intercalate "," (map prettyLeanPat pats) ++ "]"        -- still have literal lists... 
-    NPat _ lit _ _ -> prettyLeanOverLit (unXRec @(GhcPass 'Parsed) lit)     -- OverLit
+    ListPat _ pats -> "[" ++ intercalate "," (map prettyLeanPat pats) ++ "]"       
+    NPat _ lit _ _ -> prettyLeanOverLit (unXRec @(GhcPass 'Parsed) lit)    
     ParPat _ tokLeft pat tokRight -> "(" ++ prettyLeanPat pat ++ ")"
     ConPat _ (L _ name) details ->
         let conName = occNameString . occName $ name
@@ -129,6 +130,9 @@ prettyLeanOverLit (OverLit _ val) = case val of
     HsIntegral (IL _ _ i) -> gshow i
     HsFractional f -> gshow f
     HsIsString _ s -> gshow s
+        -- | op == ":" -> "::"
+        -- | otherwise -> op
+        -- where op = gshow s
 
 
 prettyLLeanExpr :: LHsExpr GhcPs -> String
@@ -136,7 +140,10 @@ prettyLLeanExpr expr = prettyLeanExpr (unXRec @(GhcPass 'Parsed) expr)
 
 prettyLeanExpr :: HsExpr GhcPs -> String
 prettyLeanExpr = \case
-    HsVar _ name -> occNameString . occName . unLoc $ name      -- variable names
+    HsVar _ name 
+        | n == ":" -> "::"      -- for lists, not sure if it's ok
+        | otherwise -> n
+        where n = occNameString . occName . unLoc $ name      -- variable names
     HsLit _ lit -> "Not implemented"    -- requires HsLit
     HsApp _ exp1 exp2 -> prettyLeanExpr (unLoc exp1) ++ " " ++ prettyLeanExpr (unLoc exp2)  -- function application to arguments
     OpApp _ exp1 op exp2 ->  prettyLeanExpr (unLoc exp1) ++ " " ++ prettyLeanExpr (unLoc op) ++ " " ++ prettyLeanExpr (unLoc exp2)   -- operators 
@@ -145,6 +152,15 @@ prettyLeanExpr = \case
     HsOverLit _ lit -> prettyLeanOverLit lit
     ExplicitList _ exprs -> "[" ++ intercalate ", " (map prettyLLeanExpr exprs) ++ "]"
     HsIf _ exp1 exp2 exp3 -> "if " ++ prettyLLeanExpr exp1 ++ " then " ++ prettyLLeanExpr exp2 ++ " else " ++ prettyLLeanExpr exp3
+    _ -> "Not implemented"
+
+
+prettyLeanLit :: HsLit GhcPs -> String
+prettyLeanLit = \case
+    HsChar _ char -> gshow char
+    HsString _ str -> gshow str 
+    HsInt _ (IL _ _ int) -> gshow int 
+    HsInteger _ int _ -> gshow int 
     _ -> "Not implemented"
 
 
