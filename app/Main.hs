@@ -24,6 +24,8 @@ import "ghc" GHC.Types.SourceText
 import Data.Void
 
 import HsToLean.TranslateHaskell (translateToLean)
+import GHC.Runtime.Eval (Term(ty))
+import GHC (HsDerivingClause(HsDerivingClause))
 
 
 prettyPrint :: String -> String
@@ -115,7 +117,37 @@ prettyLHsTyVar _ = "unknown"
 
 prettyHsDataDefn :: HsDataDefn GhcPs -> String
 prettyHsDataDefn (HsDataDefn _ _ _ _ kind cons derv) = 
-  intercalate " | " $  map prettyLConDecl cons
+  intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ prettyHsDeriving derv
+
+prettyHsDeriving :: [LHsDerivingClause GhcPs] -> String
+prettyHsDeriving clauses = "\tderiving (" ++ intercalate ", " (map prettyHsDerivingClause clauses) ++ ")"
+
+
+prettyHsDerivingClause :: LHsDerivingClause GhcPs -> String
+prettyHsDerivingClause (L _ (HsDerivingClause _ strat ((L _ typ)))) =
+  prettyDerivStrategy strat  ++ prettyDerivClauseTys typ
+
+prettyDerivClauseTys :: DerivClauseTys GhcPs -> String
+prettyDerivClauseTys tys = case tys of
+  DctSingle _ ty -> prettyLHsSigType ty
+  DctMulti _ typs -> intercalate ", " (map prettyLHsSigType typs)
+
+prettyDerivStrategy :: Maybe (LDerivStrategy GhcPs) -> String
+prettyDerivStrategy Nothing = ""
+prettyDerivStrategy (Just (L _ strategy)) = case strategy of
+  NewtypeStrategy _ -> "newtype "
+  _ -> "not implemented"
+
+
+
+-- prettyHsDeriving Nothing = ""
+-- prettyHsDeriving (L _ clauses) = "deriving (" ++ intercalate ", " (map prettyHsDerivingClause clauses) ++ ")" 
+
+-- prettyHsDerivingClause :: LHsDerivingClause GhcPs -> String
+-- prettyHsDerivingClause (L _ (HsDerivingClause _ strategy typs)) =
+--   "Not implemented" ++ " " ++ intercalate ", " (map prettyLHsSigType (unLoc typs))
+
+
 
 
 
