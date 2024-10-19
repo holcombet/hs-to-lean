@@ -25,10 +25,12 @@ library
     exposed-modules:  Test
                     , TestInsertionSort
                     , TranslateHaskell
+                    , Calendar
                     -- , ASTGen
 
     -- Modules included in this library but not exported.
-    -- other-modules:
+    -- other-modules:      Tests.TestInsertionSort
+
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
