@@ -23,7 +23,7 @@ import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
 import Data.Void
 
-import TranslateHaskell (translateToLean)
+import HsToLean.TranslateHaskell (translateToLean)
 
 
 prettyPrint :: String -> String
@@ -59,6 +59,7 @@ main = do
 
       -- NOTE: uncomment line 61 to generate AST
       -- liftIO $ putStrLn $ gshow astForLean
+      liftIO $ writeFile "AST.txt" (gshow astForLean)
 
       -- Haskell ast to Haskell
       let astMod = hsmodName $ unLoc $ pm_parsed_source parsedModule
@@ -78,13 +79,14 @@ prettyHsDecl :: HsDecl GhcPs -> String
 prettyHsDecl = \case
   TyClD _ decl -> case decl of
     SynDecl _ name tyVar fix rhs -> "type " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name  ++ " = " ++ prettyLHsType rhs
-    -- TODO: DataDecl, ClassDecl
+    -- TODO: ClassDecl
     DataDecl _ name tyVar fix dataDef ->
       let dataName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
           tyVarStr = prettyLHsQTyVars tyVar
           dataDefStr = prettyHsDataDefn dataDef
       in "data " ++ dataName ++ " " ++ tyVarStr ++ " = " ++ dataDefStr ++ "\n"
     _ -> "Not implemented"
+  -- TODO: InstD, DerivD
   ValD _ decl -> case decl of 
     FunBind _ name matches _ -> 
       let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
@@ -113,8 +115,11 @@ prettyLHsTyVar _ = "unknown"
 
 prettyHsDataDefn :: HsDataDefn GhcPs -> String
 prettyHsDataDefn (HsDataDefn _ _ _ _ kind cons derv) = 
-  intercalate " | " $ map prettyLConDecl cons
+  intercalate " | " $  map prettyLConDecl cons
 
+
+
+ 
 prettyLConDecl :: LConDecl GhcPs -> String
 prettyLConDecl (L _ (ConDeclH98 _ name _ _ _ details _)) = 
   occNameString (occName (unLoc name))++ " " ++ prettyHsConDetails (prettyHsConDeclH98Details details)
@@ -128,7 +133,6 @@ prettyHsConDeclH98Details details = case details of
   -- RecCon fields -> RecCon 
 
 
--- TODO: prettyHsConDetails
 prettyHsConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> String
 prettyHsConDetails details = case details of
   PrefixCon tyArgs arg -> unwords $ map prettyLHsType $ getLHsTypes arg

@@ -1,6 +1,6 @@
 {-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns #-}
 
-module TranslateHaskell (translateToLean) where
+module HsToLean.TranslateHaskell (translateToLean) where
 
 import GHC
 import GHC.Maybe
