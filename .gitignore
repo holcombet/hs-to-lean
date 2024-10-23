@@ -4,3 +4,4 @@ dist-newstyle
 output.txt
 .o 
 .hi
+.env
