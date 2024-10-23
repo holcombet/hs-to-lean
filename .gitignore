@@ -2,6 +2,6 @@ dist-newstyle
 .aider*
 .DS_Store
 output.txt
-.o 
-.hi
+*.o 
+*.hi
 .env
