@@ -95,7 +95,8 @@ prettyHsDecl = \case
           matchStrings = map (\(L _ (Match _ c pats body)) ->
             let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
                 bodyString = prettyGRHSs body
-            in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
+            in argStrings ++ bodyString) (unLoc $ mg_alts matches)
+            -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
       in  unlines matchStrings
     PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
     VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
@@ -104,8 +105,19 @@ prettyHsDecl = \case
   SigD _ decl -> case decl of
     TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
     PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
+    ClassOpSig _ isDefault names typ ->
+      let defaultStr = if isDefault then "default " else ""
+          nameStr = unwords $ map (occNameString . occName . unLoc) names
+          typeStr = prettyLHsSigType typ
+      in defaultStr ++ nameStr ++ " :: " ++ typeStr
     _ -> "Not implemented"
   _ -> "Not implemented"
+
+
+
+--------------------------
+-- Functions for DataDecl
+--------------------------
 
 prettyLHsQTyVars :: LHsQTyVars GhcPs -> String
 prettyLHsQTyVars (HsQTvs _ tyVars) = unwords $ map prettyLHsTyVar tyVars
@@ -138,26 +150,12 @@ prettyDerivStrategy (Just (L _ strategy)) = case strategy of
   NewtypeStrategy _ -> "newtype "
   _ -> "not implemented"
 
-
-
--- prettyHsDeriving Nothing = ""
--- prettyHsDeriving (L _ clauses) = "deriving (" ++ intercalate ", " (map prettyHsDerivingClause clauses) ++ ")" 
-
--- prettyHsDerivingClause :: LHsDerivingClause GhcPs -> String
--- prettyHsDerivingClause (L _ (HsDerivingClause _ strategy typs)) =
---   "Not implemented" ++ " " ++ intercalate ", " (map prettyLHsSigType (unLoc typs))
-
-
-
-
-
  
 prettyLConDecl :: LConDecl GhcPs -> String
 prettyLConDecl (L _ (ConDeclH98 _ name _ _ _ details _)) = 
   occNameString (occName (unLoc name))++ " " ++ prettyHsConDetails (prettyHsConDeclH98Details details)
 
 
--- prettyHsConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
 prettyHsConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
 prettyHsConDeclH98Details details = case details of
   PrefixCon _ args -> PrefixCon [] args
@@ -171,6 +169,11 @@ prettyHsConDetails details = case details of
   InfixCon (HsScaled _ arg1) (HsScaled _ arg2) -> prettyLHsType arg1 ++ " " ++ prettyLHsType arg2
   _ -> "Not implemented"
 
+
+
+-------------
+-- HsTypes
+-------------
 
 getLHsTypes :: [HsScaled GhcPs (LHsType GhcPs)] -> [LHsType GhcPs]
 getLHsTypes = map getLHsType
@@ -188,12 +191,27 @@ prettyLHsSigType :: LHsSigType GhcPs -> String
 prettyLHsSigType arg = prettyHsSigType (unXRec @(GhcPass 'Parsed) arg)
 
 prettyHsSigType :: HsSigType GhcPs -> String
-prettyHsSigType = \case
-  HsSig ext bndrs body -> prettyLHsType body
+prettyHsSigType = \case 
+  HsSig ext bndrs body -> prettyHsOuterSigTyVarBndrs bndrs ++ prettyLHsType body
+-- prettyHsSigType = \case
+--   HsSig ext bndrs body -> prettyLHsType body
+
+prettyHsOuterSigTyVarBndrs :: HsOuterSigTyVarBndrs GhcPs -> String
+prettyHsOuterSigTyVarBndrs thing = case thing of
+  HsOuterImplicit _ -> ""
+  HsOuterExplicit _ bndrs -> unwords $ map processLTyVarBndr bndrs
+
+processLTyVarBndr ::LHsTyVarBndr flag GhcPs -> String
+processLTyVarBndr (L _ bndr) = processTyVarBndr bndr
+
+processTyVarBndr :: HsTyVarBndr flag GhcPs -> String
+processTyVarBndr (UserTyVar _ _ (L _ name)) = occNameString $ occName name
+processTyVarBndr (KindedTyVar _ _ (L _ name) _) = occNameString $ occName name
+
+
 
 prettyLHsType :: LHsType GhcPs -> String
 prettyLHsType arg = prettyHsType (unXRec @(GhcPass 'Parsed) arg)
-
 
 
 prettyHsType :: HsType GhcPs -> String
@@ -204,10 +222,21 @@ prettyHsType = \case
   HsParTy _ typ -> prettyLHsType typ
   HsOpTy _ _ typ1 id typ2 -> prettyLHsType typ1 ++ (occNameString . occName . unLoc $ id) ++ prettyLHsType typ2
   HsListTy _ typ -> "[" ++ prettyLHsType typ ++ "]"   -- list type
+  HsQualTy _ context typ -> prettyLHsContext context ++ " => " ++ prettyLHsType typ
   -- TODO: HsForAllTy, HsQualTy, HsAppKindTy, HsTupleTy, HsSumTy, HsIParamTy, HsStarTy, HsKindSig
   --       HsSpliceTy, HsDocTy, HsBangTy, HsRecTy, HsExplicitListTy, HsExplicitTupleTy, HsTyLit, 
   --       HsWildCardTy
   _ -> "Not implemented" 
+
+
+
+prettyLHsContext :: LHsContext GhcPs -> String
+prettyLHsContext (L _ context) = "(" ++ intercalate ", " (map prettyLHsType context) ++ ")"
+
+
+-------------------------
+-- Matches (for FunBind)
+-------------------------
 
 prettyMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs) -> String
 prettyMatchGroup = \case
@@ -217,6 +246,10 @@ prettyLMatch :: LMatch GhcPs (LHsExpr GhcPs) -> String
 prettyLMatch (L _ match) = case match of 
   Match _ _ pats body -> unwords (map prettyPat pats) ++ " -> " ++ prettyGRHSs body
 
+
+------------------------------
+-- Pat (for Pattern Matching)
+------------------------------
 
 prettyPat :: LPat GhcPs -> String
 prettyPat (L _ pat) = case pat of
@@ -236,21 +269,6 @@ prettyPat (L _ pat) = case pat of
       -- TODO: RecCon
   _ -> "Not implemented"
 
-prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
-prettyGRHSs (GRHSs _ grhss _) = unwords $ map prettyGRHS grhss
-
-prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
-prettyGRHS (L _ (GRHS _ _ body)) = prettyLHsExpr body
-
-prettyLHsExpr :: LHsExpr GhcPs -> String
-prettyLHsExpr expr = prettyHsExpr (unXRec @(GhcPass 'Parsed) expr)
-
-prettyOverLit :: HsOverLit GhcPs -> String
-prettyOverLit (OverLit _ val) = case val of
-  HsIntegral (IL _ _ i) -> gshow i
-  HsFractional f -> gshow f
-  HsIsString _ s -> gshow s
-
 
 prettyHsConPatDetails :: HsConPatDetails GhcPs -> [String]
 prettyHsConPatDetails details = case details of
@@ -259,6 +277,45 @@ prettyHsConPatDetails details = case details of
   -- TODO: RecCon
   -- RecCon (HsRecFields fields _)  ->  map (\(L _ (HsRecFieldCon (L _ name) pat _ _)) -> (occNameString . occName $ name) ++ " = " ++ prettyPat pat) fields
 
+
+
+------------------------
+-- GRHS and HsExpr
+------------------------
+
+prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
+prettyGRHSs (GRHSs _ grhss _) = unwords $ map prettyGRHS grhss
+
+{-
+Original/bad GRHS function:
+
+prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
+prettyGRHS (L _ (GRHS _ _ body)) = prettyLHsExpr body
+
+-}
+
+prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
+prettyGRHS (L _ (GRHS _ guardStmt body)) =  -- prettyLHsExpr body
+  let guardStr = if null guardStmt then " = " else " | " ++ prettyGuardStmt guardStmt ++ " = "
+      exprStr = if null guardStmt then prettyLHsExpr body else prettyLHsExpr body ++ "\n"
+  in guardStr ++ exprStr
+  -- in guardStr  ++ prettyLHsExpr body 
+    
+
+prettyGuardStmt :: [GuardLStmt GhcPs] -> String                                                                                                                                                  
+prettyGuardStmt stmts = intercalate ", "  (map prettyStmt stmts)                                                                                                                               
+                                                                                                                                                                                                  
+prettyStmt :: GuardLStmt GhcPs -> String                                                                                                                                                         
+prettyStmt (L _ stmt) = case stmt of                                                                                                                                                             
+  BodyStmt _ expr _ _ -> prettyLHsExpr expr                                                                                                                                                     
+  LetStmt _ binds -> "local binds not implemented" --prettyLocalBinds binds                                                                                                                                                      
+  BindStmt _ pat expr -> "bind stmt not implemented" -- prettyPat pat ++ " | " ++ prettyLHsExpr expr                                                                                                                            
+  _ -> "Not implemented"      
+
+
+
+prettyLHsExpr :: LHsExpr GhcPs -> String
+prettyLHsExpr expr = prettyHsExpr (unXRec @(GhcPass 'Parsed) expr)
 
 
 prettyHsExpr :: HsExpr GhcPs -> String 
@@ -276,6 +333,16 @@ prettyHsExpr = \case
   -- TODO: HsCase, HsLam, NegApp, ExplicitTuple, ExplicitSum, HsMultiIf, HsLet, HsDo, ExplicitList
   -- TODO: others tbd
   _ -> "Not implemented"
+
+---------------------------
+-- Lit (OverLit, HsLit)
+---------------------------
+
+prettyOverLit :: HsOverLit GhcPs -> String
+prettyOverLit (OverLit _ val) = case val of
+  HsIntegral (IL _ _ i) -> gshow i
+  HsFractional f -> gshow f
+  HsIsString _ s -> gshow s
 
 
 prettyHsLit :: HsLit GhcPs -> String

@@ -1,0 +1,19 @@
+Not implemented
+Not implemented
+def nthElement : List Not implemented -> Nat -> Not implemented
+	| [] , a => Nothing
+	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
+
+def next : Not implemented
+	| x => minBound succ x
+
+def pad : Nat -> Not implemented
+	| day => Not implemented
+
+def month : Not implemented -> Not implemented -> Nat -> Not implemented
+	| m, startDay, maxDay => show m ++ Not implemented ++ week ++ spaces Sunday
+
+	|  => month January Thursday (31) ++ month February Sunday (28) ++ month March Sunday (31) ++ month April Wednesday (30) ++ month May Friday (31) ++ month June Monday (30) ++ month July Wednesday (31) ++ month August Saturday (31) ++ month September Tuesday (30) ++ month October Thursday (31) ++ month November Sunday (30) ++ month December Tuesday (31)
+
+	|  => putStr year
+
