@@ -22,10 +22,12 @@ import Data.String (String)
 import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
 import Data.Void
+import GHC.Runtime.Eval (Term(ty))
+
 
 import HsToLean.TranslateHaskell (translateToLean)
-import GHC.Runtime.Eval (Term(ty))
-import GHC (HsDerivingClause(HsDerivingClause))
+import StructureAst (structAst)
+
 
 
 prettyPrint :: String -> String
@@ -57,11 +59,12 @@ main = do
       parsedModule <- GHC.parseModule modSum
 
       let astForLean = pm_parsed_source parsedModule
-      liftIO $ translateToLean astForLean
 
-      -- NOTE: uncomment line 61 to generate AST
-      -- liftIO $ putStrLn $ gshow astForLean
+      -- following 3 lines for generating AST in .txt and structuring
+      liftIO $ translateToLean astForLean
       liftIO $ writeFile "AST.txt" (gshow astForLean)
+      liftIO $ structAst "AST.txt"
+
 
       -- Haskell ast to Haskell
       let astMod = hsmodName $ unLoc $ pm_parsed_source parsedModule

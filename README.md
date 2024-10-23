@@ -11,11 +11,14 @@ Tested with ghc 9.4.8
 In the parent directory (hs-to-lean), run the program 
 ```
 cabal build
-cabal run 
+cabal run > "output.txt"
 ```
 
-**NOTE:** At present, the program is designed to output the translated Lean code into a file named "result.txt" in src.
-
+**NOTE:** Multiple output files are generated when running this program to promote visualization during the testing and development process. Current outputs include:
+* output.txt : the result of parsing the AST back into Haskell (from `cabal run > "output.txt"`)
+* AST.txt : the raw AST generated from parsing using ghc-lib-parser 
+* hs_structured_AST.txt : the structured AST, derived from AST.txt 
+* src/result.txt : the result of parsing the AST into Lean
 
 ## Relevant Developmental Notes:
 
