@@ -23,10 +23,12 @@ import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
 import Data.Void
 import GHC.Runtime.Eval (Term(ty))
+import "ghc" GHC.Data.FastString (unpackFS)
 
 
 import HsToLean.TranslateHaskell (translateToLean)
 import StructureAst (structAst)
+import Data.Bool (Bool)
 
 
 
@@ -98,7 +100,9 @@ prettyHsDecl = \case
           matchStrings = map (\(L _ (Match _ c pats body)) ->
             let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
                 bodyString = prettyGRHSs body
-            in argStrings ++ bodyString) (unLoc $ mg_alts matches)
+                indent = if hasGuards body then replicate (length argStrings) ' ' else ""
+            in argStrings ++  bodyString) (unLoc $ mg_alts matches)
+          -- indent = if any hasGuards (map (\(L _ (Match _ c pats body)) -> body ) (unLoc $ mg_alts matches)) then replicate (length funName) ' ' else ""
             -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
       in  unlines matchStrings
     PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
@@ -289,14 +293,6 @@ prettyHsConPatDetails details = case details of
 prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
 prettyGRHSs (GRHSs _ grhss _) = unwords $ map prettyGRHS grhss
 
-{-
-Original/bad GRHS function:
-
-prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
-prettyGRHS (L _ (GRHS _ _ body)) = prettyLHsExpr body
-
--}
-
 prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
 prettyGRHS (L _ (GRHS _ guardStmt body)) =  -- prettyLHsExpr body
   let guardStr = if null guardStmt then " = " else " | " ++ prettyGuardStmt guardStmt ++ " = "
@@ -304,9 +300,15 @@ prettyGRHS (L _ (GRHS _ guardStmt body)) =  -- prettyLHsExpr body
   in guardStr ++ exprStr
   -- in guardStr  ++ prettyLHsExpr body 
     
+-- hasGuards checks for guards in GRHSs constructor
+-- called by FunBind in HsDecl to ensure proper indentation
+hasGuards :: GRHSs GhcPs (LHsExpr GhcPs) -> Bool
+hasGuards (GRHSs _ grhss _ ) = not (all ( null . grhssGuards) grhss)
+  where
+    grhssGuards (L _ (GRHS _ guards _)) = guards
 
 prettyGuardStmt :: [GuardLStmt GhcPs] -> String                                                                                                                                                  
-prettyGuardStmt stmts = intercalate ", "  (map prettyStmt stmts)                                                                                                                               
+prettyGuardStmt stmts = intercalate ", "  (map prettyStmt stmts)                                                                                                                        
                                                                                                                                                                                                   
 prettyStmt :: GuardLStmt GhcPs -> String                                                                                                                                                         
 prettyStmt (L _ stmt) = case stmt of                                                                                                                                                             
@@ -333,9 +335,13 @@ prettyHsExpr = \case
   HsIf _ exp1 exp2 exp3 -> "if " ++ prettyLHsExpr exp1 ++
                            " then " ++ prettyLHsExpr exp2 ++
                            " else " ++ prettyLHsExpr exp3
+  HsCase _ exp matches -> "case " ++ prettyLHsExpr exp ++ " of \n" ++ indent (prettyMatchGroup matches)
   -- TODO: HsCase, HsLam, NegApp, ExplicitTuple, ExplicitSum, HsMultiIf, HsLet, HsDo, ExplicitList
   -- TODO: others tbd
   _ -> "Not implemented"
+
+indent :: String -> String
+indent = unlines . map ("\t" ++) . lines
 
 ---------------------------
 -- Lit (OverLit, HsLit)
@@ -351,7 +357,7 @@ prettyOverLit (OverLit _ val) = case val of
 prettyHsLit :: HsLit GhcPs -> String
 prettyHsLit = \case
   HsChar _ char -> gshow char
-  HsString _ str -> gshow str
+  HsString _ str -> gshow(unpackFS str)
   HsInt _ (IL _ _ int) -> gshow int   -- might be wrong
   HsInteger _ int _ -> gshow int
   -- TODO: HsRat
