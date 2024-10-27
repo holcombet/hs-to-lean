@@ -9,11 +9,18 @@ data Month
     | July    | August   | September | October | November | December
     deriving (Enum, Bounded, Show)
 
+data Shape = Circle Float Float Float | Rectangle Float Float Float Float 
+
 nthElement :: [a] -> Int -> Maybe a 
 nthElement [] a = Nothing
 nthElement (x:xs) a | a <= 0 = Nothing
                     | a == 1 = Just x
                     | a > 1 = nthElement xs (a-1)
+
+calculateArea :: Float -> Float
+calculateArea r = 
+    let pi = 3.14
+    in pi * r * r
 
 next :: (Eq a, Enum a, Bounded a) => a -> a
 next x | x == maxBound = minBound

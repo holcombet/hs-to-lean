@@ -24,11 +24,14 @@ import "ghc" GHC.Types.SourceText
 import Data.Void
 import GHC.Runtime.Eval (Term(ty))
 import "ghc" GHC.Data.FastString (unpackFS)
+import Data.Bool (Bool)
+import "ghc" GHC.Data.Bag (bagToList, Bag)
+import "ghc" GHC.Hs.Binds
+import Data.Ratio ((%))
 
 
 import HsToLean.TranslateHaskell (translateToLean)
 import StructureAst (structAst)
-import Data.Bool (Bool)
 
 
 
@@ -94,32 +97,59 @@ prettyHsDecl = \case
       in "data " ++ dataName ++ " " ++ tyVarStr ++ " = " ++ dataDefStr ++ "\n"
     _ -> "Not implemented"
   -- TODO: InstD, DerivD
-  ValD _ decl -> case decl of 
-    FunBind _ name matches _ -> 
-      let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
-          matchStrings = map (\(L _ (Match _ c pats body)) ->
-            let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
-                bodyString = prettyGRHSs body
-                indent = if hasGuards body then replicate (length argStrings) ' ' else ""
-            in argStrings ++  bodyString) (unLoc $ mg_alts matches)
-          -- indent = if any hasGuards (map (\(L _ (Match _ c pats body)) -> body ) (unLoc $ mg_alts matches)) then replicate (length funName) ' ' else ""
-            -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
-      in  unlines matchStrings
-    PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
-    VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
+  ValD _ decl -> prettyHsBind decl--case decl of 
+    -- FunBind _ name matches _ -> 
+    --   let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
+    --       matchStrings = map (\(L _ (Match _ c pats body)) ->
+    --         let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
+    --             bodyString = prettyGRHSs body
+    --             indent = if hasGuards body then replicate (length argStrings) ' ' else ""
+    --         in argStrings ++  bodyString) (unLoc $ mg_alts matches)
+    --       -- indent = if any hasGuards (map (\(L _ (Match _ c pats body)) -> body ) (unLoc $ mg_alts matches)) then replicate (length funName) ' ' else ""
+    --         -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
+    --   in  unlines matchStrings
+    -- PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
+    -- VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
     -- TODO: PatSynBind
-    _ -> prettyPrint $ gshow decl
-  SigD _ decl -> case decl of
-    TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
-    PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
-    ClassOpSig _ isDefault names typ ->
-      let defaultStr = if isDefault then "default " else ""
-          nameStr = unwords $ map (occNameString . occName . unLoc) names
-          typeStr = prettyLHsSigType typ
-      in defaultStr ++ nameStr ++ " :: " ++ typeStr
-    _ -> "Not implemented"
+    -- _ -> prettyPrint $ gshow decl
+  SigD _ decl -> prettySig decl --case decl of
+    -- TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
+    -- PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
+    -- ClassOpSig _ isDefault names typ ->
+    --   let defaultStr = if isDefault then "default " else ""
+    --       nameStr = unwords $ map (occNameString . occName . unLoc) names
+    --       typeStr = prettyLHsSigType typ
+    --   in defaultStr ++ nameStr ++ " :: " ++ typeStr
+    -- _ -> "Not implemented"
   _ -> "Not implemented"
 
+
+prettyHsBind :: HsBind GhcPs -> String
+prettyHsBind decl = case decl of
+  FunBind _ name matches _ -> 
+    let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
+        matchStrings = map (\(L _ (Match _ c pats body)) ->
+          let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
+              bodyString = prettyGRHSs body
+              indent = if hasGuards body then replicate (length argStrings) ' ' else ""
+          in argStrings ++  bodyString) (unLoc $ mg_alts matches)
+        -- indent = if any hasGuards (map (\(L _ (Match _ c pats body)) -> body ) (unLoc $ mg_alts matches)) then replicate (length funName) ' ' else ""
+          -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
+    in  unlines matchStrings
+  PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
+  VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
+  _ -> prettyPrint $ gshow decl
+
+prettySig :: Sig GhcPs -> String
+prettySig decl = case decl of
+  TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
+  PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
+  ClassOpSig _ isDefault names typ ->
+    let defaultStr = if isDefault then "default " else ""
+        nameStr = unwords $ map (occNameString . occName . unLoc) names
+        typeStr = prettyLHsSigType typ
+    in defaultStr ++ nameStr ++ " :: " ++ typeStr
+  _ -> "Not implemented"
 
 
 --------------------------
@@ -136,7 +166,9 @@ prettyLHsTyVar _ = "unknown"
 
 prettyHsDataDefn :: HsDataDefn GhcPs -> String
 prettyHsDataDefn (HsDataDefn _ _ _ _ kind cons derv) = 
-  intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ prettyHsDeriving derv
+  -- intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ prettyHsDeriving derv
+  intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ deriv 
+    where deriv = if not (null derv) then prettyHsDeriving derv else ""
 
 prettyHsDeriving :: [LHsDerivingClause GhcPs] -> String
 prettyHsDeriving clauses = "\tderiving (" ++ intercalate ", " (map prettyHsDerivingClause clauses) ++ ")"
@@ -291,7 +323,10 @@ prettyHsConPatDetails details = case details of
 ------------------------
 
 prettyGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String
-prettyGRHSs (GRHSs _ grhss _) = unwords $ map prettyGRHS grhss
+prettyGRHSs (GRHSs _ grhss binds) = unwords ( map prettyGRHS grhss)  ++ bindr -- prettyLocalBinds binds
+  where
+    -- formating, don't know if it will work for all things, but works for month function
+    bindr = if prettyLocalBinds binds == "" then "" else "\n\twhere\n" ++ "\t\t" ++ intercalate "\n\t\t" (lines $ prettyLocalBinds binds)
 
 prettyGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String
 prettyGRHS (L _ (GRHS _ guardStmt body)) =  -- prettyLHsExpr body
@@ -307,6 +342,8 @@ hasGuards (GRHSs _ grhss _ ) = not (all ( null . grhssGuards) grhss)
   where
     grhssGuards (L _ (GRHS _ guards _)) = guards
 
+
+-- Not sure what these two functions are for if where and let are in LocalBinds
 prettyGuardStmt :: [GuardLStmt GhcPs] -> String                                                                                                                                                  
 prettyGuardStmt stmts = intercalate ", "  (map prettyStmt stmts)                                                                                                                        
                                                                                                                                                                                                   
@@ -316,6 +353,44 @@ prettyStmt (L _ stmt) = case stmt of
   LetStmt _ binds -> "local binds not implemented" --prettyLocalBinds binds                                                                                                                                                      
   BindStmt _ pat expr -> "bind stmt not implemented" -- prettyPat pat ++ " | " ++ prettyLHsExpr expr                                                                                                                            
   _ -> "Not implemented"      
+
+----------------
+
+-- LocalBinds for let and where
+prettyLocalBinds :: HsLocalBinds GhcPs -> String
+prettyLocalBinds binds = case binds of
+  EmptyLocalBinds _ -> ""
+  HsValBinds _ (ValBinds _ bindlst sigs) ->  prettyHsValBinds  bindlst sigs
+    -- let bindList = bagToList binds
+  HsIPBinds _ ipBinds -> "Implicit parameter binds not implemented"
+
+
+-- TODO: too many newlines, figure out which to get rid of
+prettyHsValBinds :: LHsBindsLR GhcPs GhcPs -> [LSig GhcPs] -> String
+prettyHsValBinds binds sigs =
+  let bindList = bagToList binds
+      prettyBinds = map prettyLHsBindLR bindList
+      -- prettySigs = intercalate "\n" . map (prettySig . unLoc) $ sigs
+      prettySigs = map (prettySig . unLoc) $ sigs
+  -- in intercalate "\n" prettyBinds  ++ prettySigs
+  in intercalate "" prettyBinds ++ unlines prettySigs
+
+
+prettyLHsBindLR :: LHsBindLR GhcPs GhcPs -> String
+prettyLHsBindLR (L _ bind) = case bind of
+  FunBind _ id matches _ -> 
+    let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) id -- no gshow = no "" around function name
+        matchStrings = map (\(L _ (Match _ c pats body)) ->
+          let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
+              bodyString = prettyGRHSs body
+              -- indent = if hasGuards body then replicate (length argStrings) ' ' else ""
+          in argStrings ++ bodyString) (unLoc $ mg_alts matches)
+        
+    in  unlines matchStrings
+  PatBind {} -> "patBind not implemented"
+  VarBind {} -> "VarBind not implemented"
+  PatSynBind {} -> "PatSynBind not implemented"
+  -- _ -> "not implemented"
 
 
 
@@ -336,7 +411,8 @@ prettyHsExpr = \case
                            " then " ++ prettyLHsExpr exp2 ++
                            " else " ++ prettyLHsExpr exp3
   HsCase _ exp matches -> "case " ++ prettyLHsExpr exp ++ " of \n" ++ indent (prettyMatchGroup matches)
-  -- TODO: HsCase, HsLam, NegApp, ExplicitTuple, ExplicitSum, HsMultiIf, HsLet, HsDo, ExplicitList
+  HsLet _ tok1 binds tok2 exp -> "\n\tlet\n" ++ indent(indent (prettyLocalBinds binds)) ++ "\tin " ++ prettyHsExpr (unLoc exp)
+  -- TODO: HsLam, NegApp, ExplicitTuple, ExplicitSum, HsMultiIf, HsDo, ExplicitList
   -- TODO: others tbd
   _ -> "Not implemented"
 
@@ -350,7 +426,12 @@ indent = unlines . map ("\t" ++) . lines
 prettyOverLit :: HsOverLit GhcPs -> String
 prettyOverLit (OverLit _ val) = case val of
   HsIntegral (IL _ _ i) -> gshow i
-  HsFractional f -> gshow f
+  -- TODO: account for negative fractionals
+  HsFractional (FL _ neg signi exp expBase) -> --show (fromRational (negate * (signi * (10 ^  exp))))
+    -- where negate = if neg then -1 else 1
+    let sign = if neg then -1 else 1
+        factor = if exp < 0 then 1 / (10 ^ abs exp) else 10 ^ exp   -- to prevent panic! (from neg exponenets)
+    in show (fromRational (sign * (signi * factor)))
   HsIsString _ s -> gshow s
 
 

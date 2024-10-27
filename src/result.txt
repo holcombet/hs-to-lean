@@ -1,8 +1,12 @@
 Not implemented
 Not implemented
+Not implemented
 def nthElement : List Not implemented -> Nat -> Not implemented
 	| [] , a => Nothing
 	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
+
+def calculateArea : Not implemented -> Not implemented
+	| r => Not implemented
 
 def next : Not implemented
 	| x => minBound succ x
