@@ -1,20 +1,58 @@
-Not implemented
-Not implemented
-Not implemented
-def nthElement : List Not implemented -> Nat -> Not implemented
+inductive Shape where
+ 	| Circle Float Float Float
+	| Rectangle Float Float Float Float
+
+
+def nthElement : List a -> Nat -> Not implemented
 	| [] , a => Nothing
 	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
 
-def calculateArea : Not implemented -> Not implemented
+def calculateArea : Float -> Float
 	| r => Not implemented
+
+def applyFunc : Not implemented -> Nat -> Nat
+	| f, x => f x
+
+def insert : Nat -> List Nat -> List Nat
+	| x, []  => [x]
+	| x, (y :: ys) => if x < y then x :: y :: ys else y :: insert x ys
+
+def insertionSort : List Nat -> List Nat
+	| [x] => [x]
+	| (x :: xs) => insert x ( insertionSort xs )
+
+inductive DayOfWeek where
+ 	| Sunday 
+	| Monday 
+	| Tuesday 
+	| Wednesday 
+	| Thursday 
+	| Friday 
+	| Saturday 
+	deriving not implemented
+
+inductive Month where
+ 	| January 
+	| February 
+	| March 
+	| April 
+	| May 
+	| June 
+	| July 
+	| August 
+	| September 
+	| October 
+	| November 
+	| December 
+	deriving not implemented
 
 def next : Not implemented
 	| x => minBound succ x
 
-def pad : Nat -> Not implemented
+def pad : Nat -> String
 	| day => Not implemented
 
-def month : Not implemented -> Not implemented -> Nat -> Not implemented
+def month : Month -> DayOfWeek -> Nat -> String
 	| m, startDay, maxDay => show m ++ Not implemented ++ week ++ spaces Sunday
 
 	|  => month January Thursday (31) ++ month February Sunday (28) ++ month March Sunday (31) ++ month April Wednesday (30) ++ month May Friday (31) ++ month June Monday (30) ++ month July Wednesday (31) ++ month August Saturday (31) ++ month September Tuesday (30) ++ month October Thursday (31) ++ month November Sunday (30) ++ month December Tuesday (31)

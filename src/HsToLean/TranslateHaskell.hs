@@ -20,6 +20,13 @@ import "ghc" GHC.Plugins ( occNameString, HasOccName(occName) )
 import Data.String (String)
 import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
+import Data.Void
+import GHC.Runtime.Eval (Term(ty))
+import "ghc" GHC.Data.FastString (unpackFS)
+import Data.Bool (Bool)
+import "ghc" GHC.Data.Bag (bagToList, Bag)
+import "ghc" GHC.Hs.Binds
+import Data.Ratio ((%))
 
 
 translateToLean :: ParsedSource -> IO()
@@ -33,8 +40,14 @@ translateToLean ast = do
 prettyLeanDecl :: HsDecl GhcPs -> String
 prettyLeanDecl = \case
     TyClD _ decl -> case decl of
-        SynDecl _ name tyVar fix rhs -> "Not implemented"
-        _ -> "Not implemented"
+        SynDecl _ name tyVar fix rhs -> "Syn Not implemented"
+        DataDecl _ name tyVar fix dataDef ->
+            let dataName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
+                tyVarStr = prettyLLeanQTyVars tyVar
+                dataDefStr = prettyLLeanDataDefn dataDef
+            in "inductive " ++ dataName ++ " where\n " ++ "\t| " ++ dataDefStr
+        _ -> "TyClD Not implemented"
+
     ValD _ decl -> case decl of
         FunBind _ name matches _ -> 
             let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
@@ -45,12 +58,69 @@ prettyLeanDecl = \case
             in unlines matchStrings
         PatBind _ pat rhs _ -> prettyLeanPat pat ++ " = " ++ prettyLeanGRHSs rhs  
         VarBind _ var rhs -> gshow var ++ " = " ++ prettyLLeanExpr rhs    
-        _ -> "Not implemented"
+        _ -> "ValD Not implemented"
     SigD _ decl -> case decl of
         TypeSig _ names typ -> "def " ++ unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " : " ++ prettyLLeanSigWcType typ    -- requires LHsSigWcType
         PatSynSig _ names typ -> "def " ++ unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " : " ++ "Not implemented"  -- requires LHsSigType
-        _ -> "Not implemented"
-    _ -> "Not implemented"
+        _ -> "SigD Not implemented"
+    _ -> "Decl Not implemented"
+
+
+prettyLeanTyClD :: TyClDecl GhcPs -> String
+prettyLeanTyClD decl = case decl of
+    SynDecl _ name tyVar fix rhs -> "SynDecl Not implemented"
+    _ -> "TyClD Not implemented"
+
+
+---------------------------
+-- Functions for DataDecl
+---------------------------
+
+prettyLLeanQTyVars :: LHsQTyVars GhcPs -> String
+prettyLLeanQTyVars (HsQTvs _ tyVars) = unwords $ map prettyLLeanTyVar tyVars
+
+prettyLLeanTyVar :: LHsTyVarBndr () GhcPs -> String
+prettyLLeanTyVar (L _ (UserTyVar _ _ (L _ name))) = occNameString $ occName name
+prettyLLeanTyVar _ = "unknown"
+
+prettyLLeanDataDefn :: HsDataDefn GhcPs -> String
+prettyLLeanDataDefn (HsDataDefn _ _ _ _ kind cons derv) =
+    intercalate "\n\t| " (map prettyLeanLConDecl cons) ++ "\n" ++ deriv ++ "\n"
+        where deriv = if not (null derv) then prettyLeanDeriving derv else ""
+
+
+prettyLeanDeriving :: [LHsDerivingClause GhcPs] -> String
+prettyLeanDeriving clauses = "\tderiving not implemented"
+
+
+prettyLeanLConDecl :: LConDecl GhcPs -> String
+prettyLeanLConDecl (L _ (ConDeclH98 _ name _ _ _ detail _)) =
+    occNameString (occName (unLoc name)) ++ " " ++ prettyLeanConDetails (prettyLeanConDeclH98Details detail)
+
+
+prettyLeanConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+prettyLeanConDeclH98Details details = case details of
+    PrefixCon _ args -> PrefixCon [] args
+    InfixCon arg1 arg2 -> InfixCon arg1 arg2
+
+
+prettyLeanConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> String
+prettyLeanConDetails details = case details of
+    PrefixCon tyArgs arg -> unwords $ map prettyLLeanType $ getLLeanTypes arg
+    InfixCon (HsScaled _ arg1) (HsScaled _ arg2) -> prettyLLeanType arg1 ++ " " ++ prettyLLeanType arg2
+    _ -> "ConDetails Not implemented"
+
+
+
+----------------------------------
+-- Functions for Type and SigType
+----------------------------------
+
+getLLeanTypes :: [HsScaled GhcPs (LHsType GhcPs)] -> [LHsType GhcPs]
+getLLeanTypes = map getLLeanType
+
+getLLeanType :: HsScaled GhcPs (LHsType GhcPs) -> LHsType GhcPs
+getLLeanType (HsScaled _ ty) = ty
 
 
 prettyLLeanSigWcType :: LHsSigWcType GhcPs -> String
@@ -72,10 +142,12 @@ prettyLLeanType arg = prettyLeanType (unXRec @(GhcPass 'Parsed) arg)
 prettyLeanType :: HsType GhcPs -> String
 prettyLeanType = \case
     HsFunTy _ _ arg1 arg2 -> prettyLLeanType arg1 ++ " -> " ++ prettyLLeanType arg2    
-    HsTyVar _ _ typ  
+    HsTyVar _ _ typ             -- TODO: think about other data types
         | typVar == "Int" -> "Nat"
-        -- TODO: add pattern matching for other types (?)
-        | otherwise -> "Not implemented"
+        | typVar == "String" -> "String"
+        | typVar == "Float" -> "Float"
+        -- TODO: naming?
+        | otherwise -> typVar
         where typVar = occNameString . occName . unLoc $ typ      -- getting type
     HsListTy _ typ -> "List " ++ prettyLLeanType typ
     -- TODO: implement constructors

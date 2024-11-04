@@ -1,5 +1,37 @@
 module Calendar where
 
+-- test data decl with AppTy
+data Shape = Circle Float Float Float | Rectangle Float Float Float Float 
+
+-- test recursive guards
+nthElement :: [a] -> Int -> Maybe a 
+nthElement [] a = Nothing
+nthElement (x:xs) a | a <= 0 = Nothing
+                    | a == 1 = Just x
+                    | a > 1 = nthElement xs (a-1)
+
+-- Test let keyword
+calculateArea :: Float -> Float
+calculateArea r = 
+    let pi = 3.14
+    in pi * r * r
+
+-- Test HsParTy
+applyFunc :: (Int -> Int) -> Int -> Int
+applyFunc f x = f x
+
+
+insert :: Int -> [Int] -> [Int]
+insert x [] = [x]
+insert x (y:ys) = if x < y 
+                 then x:y:ys 
+         else y : insert x ys
+
+insertionSort :: [Int] -> [Int]
+insertionSort [x] = [x]
+insertionSort (x:xs) = insert x (insertionSort xs)
+
+-- test data decl with deriving 
 data DayOfWeek
     = Sunday | Monday | Tuesday | Wednesday | Thursday | Friday | Saturday
     deriving (Eq, Enum, Bounded)
@@ -9,28 +41,20 @@ data Month
     | July    | August   | September | October | November | December
     deriving (Enum, Bounded, Show)
 
-data Shape = Circle Float Float Float | Rectangle Float Float Float Float 
 
-nthElement :: [a] -> Int -> Maybe a 
-nthElement [] a = Nothing
-nthElement (x:xs) a | a <= 0 = Nothing
-                    | a == 1 = Just x
-                    | a > 1 = nthElement xs (a-1)
-
-calculateArea :: Float -> Float
-calculateArea r = 
-    let pi = 3.14
-    in pi * r * r
-
+-- test functions with typeclasses (?)
 next :: (Eq a, Enum a, Bounded a) => a -> a
 next x | x == maxBound = minBound
        | otherwise     = succ x
 
+
+-- test case keyword
 pad :: Int -> String
 pad day = case show day of
     [c] -> [' ', c]
     cs  -> cs
 
+-- test where keyword
 month :: Month -> DayOfWeek -> Int -> String
 month m startDay maxDay = show m ++ " 2015\n" ++ week ++ spaces Sunday
   where

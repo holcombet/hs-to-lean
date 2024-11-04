@@ -88,6 +88,7 @@ prettyHsModuleName (Just (L _ moduleName)) =  "module " ++ moduleNameString modu
 prettyHsDecl :: HsDecl GhcPs -> String
 prettyHsDecl = \case
   TyClD _ decl -> case decl of
+    -- TODO: include QTyVars
     SynDecl _ name tyVar fix rhs -> "type " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name  ++ " = " ++ prettyLHsType rhs
     -- TODO: ClassDecl
     DataDecl _ name tyVar fix dataDef ->
@@ -152,9 +153,7 @@ prettySig decl = case decl of
   _ -> "Not implemented"
 
 
---------------------------
--- Functions for DataDecl
---------------------------
+
 
 prettyLHsQTyVars :: LHsQTyVars GhcPs -> String
 prettyLHsQTyVars (HsQTvs _ tyVars) = unwords $ map prettyLHsTyVar tyVars
@@ -163,10 +162,14 @@ prettyLHsTyVar :: LHsTyVarBndr () GhcPs -> String
 prettyLHsTyVar (L _ (UserTyVar _ _ (L _ name))) = occNameString $ occName name
 prettyLHsTyVar _ = "unknown"
 
+--------------------------
+-- Functions for DataDecl
+--------------------------
 
 prettyHsDataDefn :: HsDataDefn GhcPs -> String
 prettyHsDataDefn (HsDataDefn _ _ _ _ kind cons derv) = 
   -- intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ prettyHsDeriving derv
+  -- put cons into function to generate different deriving typeclasses
   intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ deriv 
     where deriv = if not (null derv) then prettyHsDeriving derv else ""
 
@@ -231,7 +234,7 @@ prettyLHsSigType arg = prettyHsSigType (unXRec @(GhcPass 'Parsed) arg)
 
 prettyHsSigType :: HsSigType GhcPs -> String
 prettyHsSigType = \case 
-  HsSig ext bndrs body -> prettyHsOuterSigTyVarBndrs bndrs ++ prettyLHsType body
+  HsSig ext bndrs body -> prettyHsOuterSigTyVarBndrs bndrs  ++ prettyLHsType body
 -- prettyHsSigType = \case
 --   HsSig ext bndrs body -> prettyLHsType body
 
@@ -241,7 +244,7 @@ prettyHsOuterSigTyVarBndrs thing = case thing of
   HsOuterExplicit _ bndrs -> unwords $ map processLTyVarBndr bndrs
 
 processLTyVarBndr ::LHsTyVarBndr flag GhcPs -> String
-processLTyVarBndr (L _ bndr) = processTyVarBndr bndr
+processLTyVarBndr (L _ bndr) = processTyVarBndr bndr 
 
 processTyVarBndr :: HsTyVarBndr flag GhcPs -> String
 processTyVarBndr (UserTyVar _ _ (L _ name)) = occNameString $ occName name
@@ -258,11 +261,11 @@ prettyHsType = \case
   HsFunTy _ _ arg1 arg2 -> prettyLHsType arg1 ++ " -> " ++ prettyLHsType arg2   -- for SigTyp (function signature) I think
   HsTyVar _ _ typ -> occNameString . occName . unLoc $ typ    -- Type Variables (Int -> Int)
   HsAppTy _ typ1 typ2 -> prettyLHsType typ1 ++ " " ++ prettyLHsType typ2
-  HsParTy _ typ -> prettyLHsType typ
+  HsParTy _ typ -> "(" ++ prettyLHsType typ ++ ")"
   HsOpTy _ _ typ1 id typ2 -> prettyLHsType typ1 ++ (occNameString . occName . unLoc $ id) ++ prettyLHsType typ2
   HsListTy _ typ -> "[" ++ prettyLHsType typ ++ "]"   -- list type
-  HsQualTy _ context typ -> prettyLHsContext context ++ " => " ++ prettyLHsType typ
-  -- TODO: HsForAllTy, HsQualTy, HsAppKindTy, HsTupleTy, HsSumTy, HsIParamTy, HsStarTy, HsKindSig
+  HsQualTy _ context typ -> prettyLHsContext context ++ " => " ++ prettyLHsType typ   -- qualified type, i.e. (Eq a, Enum a, ...)
+  -- TODO: HsForAllTy, HsAppKindTy, HsTupleTy, HsSumTy, HsIParamTy, HsStarTy, HsKindSig
   --       HsSpliceTy, HsDocTy, HsBangTy, HsRecTy, HsExplicitListTy, HsExplicitTupleTy, HsTyLit, 
   --       HsWildCardTy
   _ -> "Not implemented" 
@@ -271,6 +274,7 @@ prettyHsType = \case
 
 prettyLHsContext :: LHsContext GhcPs -> String
 prettyLHsContext (L _ context) = "(" ++ intercalate ", " (map prettyLHsType context) ++ ")"
+-- HsType is often HsTyVar (typeclasses)
 
 
 -------------------------
