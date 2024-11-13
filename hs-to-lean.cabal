@@ -28,6 +28,7 @@ library
                     , Calendar
                     , StructureAst
                     , TestFunctions
+                    , SimplifyAST
                     -- , ASTGen
 
     -- Modules included in this library but not exported.
