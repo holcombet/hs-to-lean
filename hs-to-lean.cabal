@@ -29,6 +29,7 @@ library
                     , StructureAst
                     , TestFunctions
                     , SimplifyAST
+                    , HaskellToHaskell
                     -- , ASTGen
 
     -- Modules included in this library but not exported.
