@@ -31,6 +31,16 @@ insertionSort :: [Int] -> [Int]
 insertionSort [x] = [x]
 insertionSort (x:xs) = insert x (insertionSort xs)
 
+isPrime :: Int -> Bool
+isPrime n
+  | n <= 1    = False
+  | otherwise = not (hasDivisor 2)
+  where
+    hasDivisor d
+      | d * d > n      = False
+      | n `mod` d == 0 = True
+      | otherwise      = hasDivisor (d + 1)
+
 -- test data decl with deriving 
 data DayOfWeek
     = Sunday | Monday | Tuesday | Wednesday | Thursday | Friday | Saturday

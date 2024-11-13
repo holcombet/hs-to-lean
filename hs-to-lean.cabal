@@ -27,6 +27,7 @@ library
                     , HsToLean.TranslateHaskell
                     , Calendar
                     , StructureAst
+                    , TestFunctions
                     -- , ASTGen
 
     -- Modules included in this library but not exported.

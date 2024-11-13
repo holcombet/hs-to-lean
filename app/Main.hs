@@ -373,11 +373,13 @@ prettyLocalBinds binds = case binds of
 prettyHsValBinds :: LHsBindsLR GhcPs GhcPs -> [LSig GhcPs] -> String
 prettyHsValBinds binds sigs =
   let bindList = bagToList binds
-      prettyBinds = map prettyLHsBindLR bindList
+      prettyBinds = map prettyLHsBindLR bindList    -- function name and variable bindings (left side)
+                                                    -- of internal functions (i.e. days in month function)
       -- prettySigs = intercalate "\n" . map (prettySig . unLoc) $ sigs
-      prettySigs = map (prettySig . unLoc) $ sigs
+      prettySigs = map (prettySig . unLoc) $ sigs   -- pattern matching and function body (right side)
+                                                    -- of internal functions (i.e. days in month function)
   -- in intercalate "\n" prettyBinds  ++ prettySigs
-  in intercalate "" prettyBinds ++ unlines prettySigs
+  in intercalate "" prettyBinds ++ unlines prettySigs 
 
 
 prettyLHsBindLR :: LHsBindLR GhcPs GhcPs -> String

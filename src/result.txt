@@ -21,6 +21,9 @@ def insertionSort : List Nat -> List Nat
 	| [x] => [x]
 	| (x :: xs) => insert x ( insertionSort xs )
 
+def isPrime : Nat -> Bool
+	| n => False not ( hasDivisor (2) )
+
 inductive DayOfWeek where
  	| Sunday 
 	| Monday 
