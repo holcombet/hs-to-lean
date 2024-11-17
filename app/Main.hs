@@ -1,4 +1,4 @@
-{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns #-}
+{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns, OverloadedStrings #-}
 
 
 module Main where
@@ -32,8 +32,9 @@ import Data.Ratio ((%))
 
 import HsToLean.TranslateHaskell (translateToLean)
 import StructureAst (structAst)
-import SimplifyAST
+
 import HaskellToHaskell (translateHaskellToHaskell)
+import GHC (TypecheckedModule(tm_renamed_source))
 
 
 
@@ -58,12 +59,17 @@ main = do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags
-      target <- guessTarget "src/Test.hs" Nothing (Just (Cpp HsSrcFile))
+      target <- guessTarget "src/Calendar.hs" Nothing (Just (Cpp HsSrcFile))
       setTargets [target]
       load LoadAllTargets
-      let moduleName = takeBaseName "src/Test.hs"
+      let moduleName = takeBaseName "src/Calendar.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
+
+      -- trying to get the renamed (source) ast
+      typecheckedModule <- GHC.typecheckModule parsedModule
+      let rnSource = tm_renamed_source typecheckedModule
+      liftIO $ writeFile "typecheckedAST.txt" (gshow rnSource)
 
       let astForLean = pm_parsed_source parsedModule
 
@@ -71,6 +77,9 @@ main = do
       liftIO $ translateToLean astForLean
       liftIO $ writeFile "AST.txt" (gshow astForLean)
       liftIO $ structAst "AST.txt"
+
+
+
 
 
       -- Haskell ast to Haskell
@@ -83,6 +92,12 @@ main = do
 
       -- call HaskellToHaskell
       liftIO $ translateHaskellToHaskell astForLean
+
+
+
+----------------------
+-- to delete later... 
+----------------------
 
 
 -- prettyHsModuleName :: Maybe (LocatedA ModuleName) -> String

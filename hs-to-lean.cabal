@@ -25,11 +25,12 @@ library
     exposed-modules:  Test
                     , TestInsertionSort
                     , HsToLean.TranslateHaskell
+                    , HsToLean.SimpleAST
                     , Calendar
                     , StructureAst
                     , TestFunctions
-                    , SimplifyAST
                     , HaskellToHaskell
+                    
                     -- , ASTGen
 
     -- Modules included in this library but not exported.

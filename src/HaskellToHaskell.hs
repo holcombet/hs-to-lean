@@ -1,4 +1,4 @@
-{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns #-}
+{-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns, OverloadedStrings #-}
 
 
 module HaskellToHaskell (translateHaskellToHaskell) where
@@ -35,6 +35,8 @@ translateHaskellToHaskell ps = do
     let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ ps
     let prettyAst = gshow ast
     liftIO $ mapM_ (putStrLn . prettyHsDecl) ast    
+
+    
 
 
 
@@ -88,7 +90,7 @@ prettyHsBind :: HsBind GhcPs -> String
 prettyHsBind decl = case decl of
   FunBind _ name matches _ -> 
     let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
-        matchStrings = map (\(L _ (Match _ c pats body)) ->
+        matchStrings = map (\(L _ (Match _ _ pats body)) ->                                         
           let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
               bodyString = prettyGRHSs body
               indent = if hasGuards body then replicate (length argStrings) ' ' else ""
@@ -103,7 +105,7 @@ prettyHsBind decl = case decl of
 prettySig :: Sig GhcPs -> String
 prettySig decl = case decl of
   TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
-  PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
+  PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ  -- this is wrong.
   ClassOpSig _ isDefault names typ ->
     let defaultStr = if isDefault then "default " else ""
         nameStr = unwords $ map (occNameString . occName . unLoc) names
@@ -197,6 +199,7 @@ prettyHsSigType = \case
 -- prettyHsSigType = \case
 --   HsSig ext bndrs body -> prettyLHsType body
 
+-- for signatures
 prettyHsOuterSigTyVarBndrs :: HsOuterSigTyVarBndrs GhcPs -> String
 prettyHsOuterSigTyVarBndrs thing = case thing of
   HsOuterImplicit _ -> ""
@@ -205,6 +208,8 @@ prettyHsOuterSigTyVarBndrs thing = case thing of
 processLTyVarBndr ::LHsTyVarBndr flag GhcPs -> String
 processLTyVarBndr (L _ bndr) = processTyVarBndr bndr 
 
+-- for outer explicit signatures
+-- I don't think this is finished
 processTyVarBndr :: HsTyVarBndr flag GhcPs -> String
 processTyVarBndr (UserTyVar _ _ (L _ name)) = occNameString $ occName name
 processTyVarBndr (KindedTyVar _ _ (L _ name) _) = occNameString $ occName name

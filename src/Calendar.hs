@@ -1,5 +1,13 @@
 module Calendar where
 
+abc :: Int
+abc = 13
+
+
+bar = 10
+
+(x, y) = (1, 2)
+
 -- test data decl with AppTy
 data Shape = Circle Float Float Float | Rectangle Float Float Float Float 
 
