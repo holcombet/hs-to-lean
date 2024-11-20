@@ -46,6 +46,7 @@ library
                     , syb
                     , filepath
                     , directory
+                    , split
 
                   
     hs-source-dirs:   src

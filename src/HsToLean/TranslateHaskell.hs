@@ -173,11 +173,11 @@ prettyLeanPat (L _ pat) = case pat of
     NPat _ lit _ _ -> prettyLeanOverLit (unXRec @(GhcPass 'Parsed) lit)    
     ParPat _ tokLeft pat tokRight -> "(" ++ prettyLeanPat pat ++ ")"
     ConPat _ (L _ name) details ->
-        let conName = occNameString . occName $ name
+        let conName = if (occNameString . occName $ name) == ":" then "::" else occNameString . occName $ name
             patDetails = prettyLeanConPatDetails details 
         in case details of
             PrefixCon _ _ -> conName ++ " " ++ unwords patDetails       -- not sure what this does yet, no change
-            InfixCon _ _ -> intercalate (" " ++ "::" ++ " ") patDetails     -- for colon lists (::) but not quite right
+            InfixCon _ _ -> intercalate (" " ++ conName ++ " ") patDetails     -- for colon lists (::) but not quite right
 
     _ -> "Not implemented"
 

@@ -31,10 +31,10 @@ import Data.Ratio ((%))
 
 
 import HsToLean.TranslateHaskell (translateToLean)
-import StructureAst (structAst)
+import HsToLean.SimpleAST (generateSimpleAST)
 
+import StructureAst (structAst)
 import HaskellToHaskell (translateHaskellToHaskell)
-import GHC (TypecheckedModule(tm_renamed_source))
 
 
 
@@ -66,12 +66,10 @@ main = do
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
 
-      -- trying to get the renamed (source) ast
-      typecheckedModule <- GHC.typecheckModule parsedModule
-      let rnSource = tm_renamed_source typecheckedModule
-      liftIO $ writeFile "typecheckedAST.txt" (gshow rnSource)
-
+      -- make ParsedSource object to pass to translateToLean, generateSimpleAST, and translateHaskellToHaskell
       let astForLean = pm_parsed_source parsedModule
+
+    
 
       -- following 3 lines for generating AST in .txt and structuring
       liftIO $ translateToLean astForLean
@@ -79,19 +77,13 @@ main = do
       liftIO $ structAst "AST.txt"
 
 
+      -- make the simple AST
+      liftIO $ generateSimpleAST astForLean
 
-
-
-      -- Haskell ast to Haskell
-      -- let astMod = hsmodName $ unLoc $ pm_parsed_source parsedModule
-      -- let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ pm_parsed_source parsedModule
-      -- let prettyAstMod = gshow astMod
-      -- let prettyAst = gshow ast -- write your own gshow
-      -- liftIO $ (putStrLn . prettyHsModuleName) astMod
-      -- liftIO $ mapM_ (putStrLn . prettyHsDecl) ast
 
       -- call HaskellToHaskell
       liftIO $ translateHaskellToHaskell astForLean
+
 
 
 

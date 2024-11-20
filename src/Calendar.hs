@@ -1,7 +1,35 @@
 module Calendar where
 
+data MyType = Foo Int String | Bar
+
+example :: MyType -> String
+example (Foo n s) = s ++ show n
+example Bar = "No data"
+
+
+applyFunc :: (Int -> Int) -> Int -> Int
+applyFunc f x = f x
+
+greaterThanZero :: (Ord a, Num a) => a -> Bool
+greaterThanZero x = x > 0
+
+
+-- newtype MyType = MyCon (Either String Bool)
+
+
+-- test recursive guards
+nthElement :: [a] -> Int -> Maybe a 
+nthElement [] a = Nothing
+nthElement (x:xs) a | a <= 0 = Nothing
+                    | a == 1 = Just x
+                    | a > 1 = nthElement xs (a-1)
+
 abc :: Int
 abc = 13
+
+-- Test HsParTy
+
+
 
 
 bar = 10
@@ -11,12 +39,7 @@ bar = 10
 -- test data decl with AppTy
 data Shape = Circle Float Float Float | Rectangle Float Float Float Float 
 
--- test recursive guards
-nthElement :: [a] -> Int -> Maybe a 
-nthElement [] a = Nothing
-nthElement (x:xs) a | a <= 0 = Nothing
-                    | a == 1 = Just x
-                    | a > 1 = nthElement xs (a-1)
+
 
 -- Test let keyword
 calculateArea :: Float -> Float
@@ -24,9 +47,7 @@ calculateArea r =
     let pi = 3.14
     in pi * r * r
 
--- Test HsParTy
-applyFunc :: (Int -> Int) -> Int -> Int
-applyFunc f x = f x
+
 
 
 insert :: Int -> [Int] -> [Int]

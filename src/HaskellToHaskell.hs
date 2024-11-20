@@ -30,6 +30,8 @@ import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
 
 
+
+
 translateHaskellToHaskell :: ParsedSource -> IO()
 translateHaskellToHaskell ps = do
     let ast = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ ps
@@ -56,7 +58,8 @@ prettyHsDecl = \case
       let dataName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
           tyVarStr = prettyLHsQTyVars tyVar
           dataDefStr = prettyHsDataDefn dataDef
-      in "data " ++ dataName ++ " " ++ tyVarStr ++ " = " ++ dataDefStr ++ "\n"
+          typedata = getHsDataDefnNewOrData dataDef
+      in typedata ++ " " ++ dataName ++ " " ++ tyVarStr ++ " = " ++ dataDefStr ++ "\n"
     _ -> "Not implemented"
   -- TODO: InstD, DerivD
   ValD _ decl -> prettyHsBind decl--case decl of 
@@ -127,8 +130,13 @@ prettyLHsTyVar _ = "unknown"
 -- Functions for DataDecl
 --------------------------
 
+getHsDataDefnNewOrData :: HsDataDefn GhcPs -> String
+getHsDataDefnNewOrData (HsDataDefn _ nod _ _ _ _ _) = case nod of
+  NewType -> "newtype"
+  DataType -> "data"
+
 prettyHsDataDefn :: HsDataDefn GhcPs -> String
-prettyHsDataDefn (HsDataDefn _ _ _ _ kind cons derv) = 
+prettyHsDataDefn (HsDataDefn _ nod _ _ kind cons derv) = 
   -- intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ prettyHsDeriving derv
   -- put cons into function to generate different deriving typeclasses
   intercalate " | " (map prettyLConDecl cons) ++ "\n" ++ deriv 
@@ -268,7 +276,7 @@ prettyPat (L _ pat) = case pat of
   -- ParPat for (x : xs)
   ParPat _ tokLeft pat tokRight -> "(" ++ prettyPat pat ++ ")"
   ConPat _ (L _ name) details ->
-    let conName = occNameString . occName $ name
+    let conName = occNameString . occName $ name -- conName = : (assuming it's lists) or "|" for other patterns?
         patDetails = prettyHsConPatDetails details
     in case details of
       PrefixCon _ _ -> conName ++ " " ++ unwords patDetails 
