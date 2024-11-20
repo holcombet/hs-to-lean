@@ -1,17 +1,35 @@
-inductive Shape where
- 	| Circle Float Float Float
-	| Rectangle Float Float Float Float
+inductive MyType where
+ 	| Foo Nat String
+	| Bar 
 
+
+def example : MyType -> String
+	| (Foo n s) => s ++ show n
+	| Bar  => Not implemented
+
+def applyFunc : Not implemented -> Nat -> Nat
+	| f, x => f x
+
+def greaterThanZero : Not implemented
+	| x => x > (0)
 
 def nthElement : List a -> Nat -> Not implemented
 	| [] , a => Nothing
 	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
 
+def abc : Nat
+	|  => (13)
+
+	|  => (10)
+
+Not implemented = Not implemented
+inductive Shape where
+ 	| Circle Float Float Float
+	| Rectangle Float Float Float Float
+
+
 def calculateArea : Float -> Float
 	| r => Not implemented
-
-def applyFunc : Not implemented -> Nat -> Nat
-	| f, x => f x
 
 def insert : Nat -> List Nat -> List Nat
 	| x, []  => [x]
