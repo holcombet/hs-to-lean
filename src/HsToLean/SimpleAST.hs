@@ -89,7 +89,7 @@ astTyClDecl decl = case decl of
             tyVarStr = "(QualTyVar " ++ astLHsQTyVars tyVar ++ ") "
             dataDefStr = astHsDataDefn dataDef 
             typedata = astGetHsDataDefnNewOrData dataDef 
-        in "DataDecl " ++ typedata ++ dataName ++ tyVarStr ++ dataDefStr 
+        in "DataDecls " ++ typedata ++ dataName ++ tyVarStr ++ dataDefStr 
 
 
 
@@ -215,7 +215,7 @@ astGetHsDataDefnNewOrData (HsDataDefn _ nod _ _ _ _ _) = case nod of
 astHsDataDefn :: HsDataDefn GhcPs -> String
 astHsDataDefn (HsDataDefn _ nod contxt _ kind cons derv) =
     let dataCons = intercalate ", " (map astLConDecl cons)
-        deriv = "(DerivClause " ++ (if not (null derv) then astHsDeriving derv else "") ++ ") "
+        deriv = "(DerivClause " ++ (if not (null derv) then astHsDeriving derv else "[]") ++ ") "
     in "(DataDefnCons " ++ "[" ++ dataCons ++ "]) " ++ deriv
 
 
