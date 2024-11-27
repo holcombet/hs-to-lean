@@ -32,6 +32,7 @@ import Data.Ratio ((%))
 
 import HsToLean.TranslateHaskell (translateToLean)
 import HsToLean.SimpleAST (generateSimpleAST)
+import HsToLean.HsSimpleAST (cleanAST)
 
 import StructureAst (structAst)
 import HaskellToHaskell (translateHaskellToHaskell)

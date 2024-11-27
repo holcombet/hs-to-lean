@@ -15,9 +15,9 @@ import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
-import "ghc" GHC.Plugins ( occNameString, HasOccName(occName) )
+import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), isBoxed)
 import Data.String (String)
-import Data.List (intercalate, isPrefixOf, tails, findIndex)
+import Data.List (intercalate, isPrefixOf, tails, findIndex, transpose)
 import Data.List.Split (splitOn)
 import "ghc" GHC.Types.SourceText
 import Data.Void
@@ -27,6 +27,8 @@ import Data.Bool (Bool)
 import "ghc" GHC.Data.Bag (bagToList, Bag)
 import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
+import GHC.Base (String)
+import Data.Kind (FUN)
 
 
 
@@ -57,6 +59,11 @@ getFirstElement (x : _ ) = x
 prependConstructor :: String -> [String] -> [String]
 prependConstructor prefix = map (prefix ++) 
 
+
+---------------------------------------------------------------------
+-- Function that Triggers translations depending on Decl Constructor
+---------------------------------------------------------------------
+
 astDecl :: HsDecl GhcPs -> String
 astDecl = \case
     TyClD _ decl -> astTyClDecl decl
@@ -68,10 +75,28 @@ astDecl = \case
 --------------------------------------
 -- Functions for HsDecl Constructors
 --------------------------------------
+
 astTyClDecl :: TyClDecl GhcPs -> String
 astTyClDecl decl = case decl of
-    SynDecl _ name tyVar fix rhs -> "SynDecl " ++ "Not Implemented"
-    DataDecl _ name tyVar fix dataDef -> "DataDecl " ++ "Not Implemented"
+    SynDecl _ name tyVar fix rhs -> --"SynDecl " ++ "Not Implemented"
+        let synName = "(SynName " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name ++ ") "
+            tyVarString = "(QualTyVar " ++ astLHsQTyVars tyVar ++ ") "
+            rhsStr = "(SynBody " ++  astHsType (unLoc rhs) ++ ") "
+        in "SynDecls " ++ synName ++ " " ++ tyVarString ++ rhsStr 
+
+    DataDecl _ name tyVar fix dataDef -> 
+        let dataName = "(DataName " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name ++ ") "
+            tyVarStr = "(QualTyVar " ++ astLHsQTyVars tyVar ++ ") "
+            dataDefStr = astHsDataDefn dataDef 
+            typedata = astGetHsDataDefnNewOrData dataDef 
+        in "DataDecl " ++ typedata ++ dataName ++ tyVarStr ++ dataDefStr 
+
+
+
+astHsBindName :: HsBind GhcPs -> String 
+astHsBindName decl = case decl of
+    FunBind _ name matches _ ->  ((occNameString . occName . unXRec @(GhcPass 'Parsed)) name)
+    _ -> "HsBindName Not Implemented"
 
 
 astHsBind :: HsBind GhcPs -> String
@@ -85,18 +110,167 @@ astHsBind decl = case decl of
 
             -- matchPats = map (\(L _ (Match _ _ pats body)) -> (map unLoc pats)) (unLoc $ mg_alts matches)
             -- matchGRHSs = map (\(L _ (Match _ _ _ body)) -> "GRHSs Not Implemented") (unLoc $ mg_alts matches)
-            -- boundVar = findBoundVar matchPats
-        in "FBind " ++ funName ++ " " ++ "[" ++ intercalate ", " matchStrings ++ "] "-- FunBind constructor turned to FBind to avoid name conflicts
+            matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
+
+            boundVar = filterValidPatt $ boundVarToString $ transposeBoundVar matchLPats
+            -- boundVar = findBoundVar matchLPats
+
+        -- in "FBind " ++ funName ++ " " ++ "[" ++ intercalate ", " matchStrings ++ "] "-- FunBind constructor turned to FBind to avoid name conflicts
+        in "FBind " ++ funName ++ " " ++ ("(PatArgs [" ++ intercalate ", " boundVar ++ "]) ") ++ "(Matches " ++ "[ " ++ intercalate ", " matchStrings ++ "]) "  
     PatBind _ pat rhs _ -> "PatBind " ++ "Not Implemented"
     VarBind _ var rhs -> "VarBind " ++ "Not Implemented"
     _ -> "HsBind Not Implemented"
 
 
-findBoundVar :: [[Pat GhcPs]] -> [Pat GhcPs]
-findBoundVar [] = []
-findBoundVar (x : xs) = []
+---------------------------------------------------
+-- Functions to make list of variables for TypeSig
+-- mostly related to FunBind
+---------------------------------------------------
+
+-- transpose nested list to group naming options from each pattern matching line in function body
+transposeBoundVar :: [[LPat GhcPs]] -> [[LPat GhcPs]]
+transposeBoundVar = transpose
 
 
+-- translate it all to strings
+boundVarToString :: [[LPat GhcPs]] -> [[String]]
+boundVarToString [] = []
+boundVarToString (x : xs) =
+    let opt = findValidPattNames (map astPat x)
+    in opt : boundVarToString xs
+
+
+-- find all the valid variables in each inner list (will likely be VarPatt)
+-- TODO: think of cases where it would not be VarPatt(?)
+filterValidPatt :: [[String]] -> [String]
+filterValidPatt xs = map chooseVar xs
+
+
+-- returns the (first) instance of VarPatt
+-- if there is none in the list, returns ""
+chooseVar :: [String] -> String
+chooseVar [] = ""
+chooseVar (x : xs) =
+    let pattTy = words x
+        retVar 
+            | head pattTy == "(VarPatt" = x
+            -- | head pattTy == "(ConPattInfix" = x 
+            | otherwise =  chooseVar xs
+    in retVar
+
+-----------------------------------------------------------------------------------
+-- Functions that get the valid (i.e. non PrefixCon) strings and returns as a list
+
+findValidPattNames :: [String] -> [String]
+findValidPattNames [] = []
+findValidPattNames (x:xs) =
+    let terms = words x
+        name  
+            | head terms == "(VarPatt" =  x 
+            | head terms == "(ParPatt" && head (tail terms) == "(ConPattInfix"= getConPattVal (unwords (tail terms))
+            | head terms == "(ConPattInfix" = getConPattVal x 
+            | otherwise =  "NA"
+
+    in name : findValidPattNames xs
+
+
+-- gets the last "item" of ConPattInfix (the list name)
+-- returns the type (usually VarPatt) and the name (such as xs)
+getConPattVal :: String -> String
+getConPattVal "" = ""
+getConPattVal x = 
+    let terms = words x
+        varName = getNthElement 6 terms ++ " " ++  getNthElement 7 terms
+    in varName
+
+
+
+-- helper function to get an element at a specific position of a list 
+-- for getting PatArgs
+getNthElement :: Int -> [String] -> String 
+getNthElement a [] = "NA"
+getNthElement a (x : xs)    | a <= 0 = "NA"
+                            | a == 1 = x
+                            | a > 1 = getNthElement (a-1) xs
+
+
+
+
+
+--------------------------------------------------------------
+--------------------------------------------------------------
+
+    
+------------------------------------------------------------
+-- DataDecl Helper Functions
+------------------------------------------------------------
+
+-- function for determining if data decl is data or newtype
+astGetHsDataDefnNewOrData :: HsDataDefn GhcPs -> String 
+astGetHsDataDefnNewOrData (HsDataDefn _ nod _ _ _ _ _) = case nod of 
+    NewType -> "(DefnType \"newtype\") " 
+    DataType -> "(DefnType \"data\") "
+
+-- function for the body of data declaration/definition
+astHsDataDefn :: HsDataDefn GhcPs -> String
+astHsDataDefn (HsDataDefn _ nod contxt _ kind cons derv) =
+    let dataCons = intercalate ", " (map astLConDecl cons)
+        deriv = "(DerivClause " ++ (if not (null derv) then astHsDeriving derv else "") ++ ") "
+    in "(DataDefnCons " ++ "[" ++ dataCons ++ "]) " ++ deriv
+
+
+-- for the constructor declarations of data definition
+astLConDecl :: LConDecl GhcPs -> String
+astLConDecl (L _ (ConDeclH98 _ name _ _ _ details _ )) = 
+    "(ConsName " ++ occNameString (occName (unLoc name)) ++ ") " ++ " " ++ astHsConDetails (astHsConDeclH98Details details)
+
+---------
+-- helper functions for astLConDecl
+astHsConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+astHsConDeclH98Details details = case details of 
+    PrefixCon _ args -> PrefixCon [] args 
+    InfixCon arg1 arg2 -> InfixCon arg1 arg2 
+    -- TODO: RecCon 
+
+astHsConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> String 
+astHsConDetails details = case details of 
+    PrefixCon tyArgs arg -> "(ConDetails [" ++ (intercalate ", " $ map astHsType (map unLoc (astGetLHsTypes arg))) ++ "]) "
+
+
+astGetLHsTypes :: [HsScaled GhcPs (LHsType GhcPs)] -> [LHsType GhcPs]
+astGetLHsTypes = map astGetLHsType
+
+
+astGetLHsType :: HsScaled GhcPs (LHsType GhcPs) -> LHsType GhcPs 
+astGetLHsType (HsScaled _ ty) = ty
+--------
+
+-----------
+-- helper functions for astHsDeriving
+
+-- for getting the functions being derived (will be more complicated later because Lean doesn't have same deriving constructors)
+astHsDeriving :: [LHsDerivingClause GhcPs] -> String 
+astHsDeriving clauses = "[" ++ intercalate ", " (map astHsDerivingClause clauses) ++ "] "
+
+astHsDerivingClause :: LHsDerivingClause GhcPs -> String 
+astHsDerivingClause (L _ (HsDerivingClause _ strat ((L _ typ)))) =
+    intercalate ", " (astDerivClauseTys typ)  
+
+astDerivStrategy :: Maybe (LDerivStrategy GhcPs) -> String 
+astDerivStrategy Nothing = ""
+astDerivStrategy (Just (L _ strategy)) = ""     -- Lean doesn't have any deriving strategies, I don't believe
+
+
+astDerivClauseTys :: DerivClauseTys GhcPs -> [String]
+astDerivClauseTys tys = case tys of 
+    DctSingle _ ty -> [astDerivSig (unLoc ty)]
+    DctMulti _ typs -> map astDerivSig (map unLoc typs)
+
+
+astDerivSig :: HsSigType GhcPs -> String
+astDerivSig = \case 
+    HsSig _ _ body -> astHsType (unLoc body )
+-------------
 
 -----------------------------------
 -- Function(s) for Sig Constructors
@@ -145,14 +319,22 @@ astHsType = \case
     _ -> "HsType Not Implemented"
 
 
+-- function that makes all types in FunTy a list of types (for HsFunTy)
 extractArgs :: HsType GhcPs -> [HsType GhcPs]
 extractArgs (HsFunTy _ _ arg1 arg2) = unXRec @(GhcPass 'Parsed) arg1 : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
 extractArgs x = [x]
 
-
+-- gets context for HsQualTy
 astContext :: LHsContext GhcPs -> String
 astContext (L _ context) = "(Context [" ++ intercalate ", " (map astHsType (map (unXRec @(GhcPass 'Parsed)) context)) ++ "]) "
 
+
+-- gets types for SynDecl
+astLHsQTyVars :: LHsQTyVars GhcPs -> String
+astLHsQTyVars (HsQTvs _ tyVars) = "[" ++ intercalate ", " (map astLHsTyVar tyVars) ++ "] "
+
+astLHsTyVar :: LHsTyVarBndr () GhcPs -> String 
+astLHsTyVar (L _ (UserTyVar _ _ (L _ name))) = "(TyVar " ++ occNameString (occName name) ++ ") "
 
 -----------------------------------------
 -- Functions for Pat (Pattern Matching)
@@ -167,8 +349,8 @@ astPat (L _ pat) = case pat of
         let conName = occNameString . occName $ name
             patDetails = astConPatDetails details 
         in case details of
-            PrefixCon _ _ -> "(ConPatt " ++ conName ++ " " ++ unwords patDetails ++ ") "
-            InfixCon _ _ -> "(ConPatt " ++ intercalate (" " ++ conName ++ " ") patDetails ++ ") "
+            PrefixCon _ _ -> "(ConPattPrefix " ++ ("(ConN \"" ++ conName ++ "\") ") ++ " " ++ "[" ++ intercalate ", "  patDetails ++ "] " ++ ") "
+            InfixCon _ _ -> "(ConPattInfix " ++ intercalate (" " ++ ("(ConN \"" ++ conName ++ "\") ")++ " ") patDetails ++ ") "
     ParPat _ _ pat _ -> "(ParPatt " ++ astPat pat ++ ") "
     -- NPat _ lit _ _ ->
     _ -> "Patt Not Implemented"

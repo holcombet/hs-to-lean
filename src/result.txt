@@ -1,7 +1,15 @@
+Syn Not implemented
+Syn Not implemented
+def pad : Nat -> String
+	| day => Not implemented
+
+def greaterThanZero : Not implemented
+	| x => x > (0)
+
 inductive MyType where
  	| Foo Nat String
 	| Bar 
-
+	deriving not implemented
 
 def example : MyType -> String
 	| (Foo n s) => s ++ show n
@@ -9,9 +17,6 @@ def example : MyType -> String
 
 def applyFunc : Not implemented -> Nat -> Nat
 	| f, x => f x
-
-def greaterThanZero : Not implemented
-	| x => x > (0)
 
 def nthElement : List a -> Nat -> Not implemented
 	| [] , a => Nothing
@@ -69,9 +74,6 @@ inductive Month where
 
 def next : Not implemented
 	| x => minBound succ x
-
-def pad : Nat -> String
-	| day => Not implemented
 
 def month : Month -> DayOfWeek -> Nat -> String
 	| m, startDay, maxDay => show m ++ Not implemented ++ week ++ spaces Sunday

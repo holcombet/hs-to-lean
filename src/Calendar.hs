@@ -1,6 +1,20 @@
 module Calendar where
 
-data MyType = Foo Int String | Bar
+type Name = String
+
+type ResultFunction a b = a -> Either String b
+
+-- test case keyword
+pad :: Int -> String
+pad day = case show day of
+    [c] -> [' ', c]
+    cs  -> cs
+
+greaterThanZero :: (Ord a, Num a) => a -> Bool
+greaterThanZero x = x > 0
+
+data MyType = Foo Int String | Bar 
+    deriving (Eq)
 
 example :: MyType -> String
 example (Foo n s) = s ++ show n
@@ -10,8 +24,7 @@ example Bar = "No data"
 applyFunc :: (Int -> Int) -> Int -> Int
 applyFunc f x = f x
 
-greaterThanZero :: (Ord a, Num a) => a -> Bool
-greaterThanZero x = x > 0
+
 
 
 -- newtype MyType = MyCon (Either String Bool)
@@ -87,11 +100,7 @@ next x | x == maxBound = minBound
        | otherwise     = succ x
 
 
--- test case keyword
-pad :: Int -> String
-pad day = case show day of
-    [c] -> [' ', c]
-    cs  -> cs
+
 
 -- test where keyword
 month :: Month -> DayOfWeek -> Int -> String
