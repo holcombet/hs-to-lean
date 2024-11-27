@@ -17,7 +17,7 @@ import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
-import "ghc" GHC.Plugins ( occNameString, HasOccName(occName) )
+import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), isBoxed)
 import Data.String (String)
 import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
@@ -28,6 +28,7 @@ import Data.Bool (Bool)
 import "ghc" GHC.Data.Bag (bagToList, Bag)
 import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
+
 
 
 
@@ -52,7 +53,11 @@ prettyHsDecl :: HsDecl GhcPs -> String
 prettyHsDecl = \case
   TyClD _ decl -> case decl of
     -- TODO: include QTyVars
-    SynDecl _ name tyVar fix rhs -> "type " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name  ++ " = " ++ prettyLHsType rhs
+    SynDecl _ name tyVar fix rhs -> --"type " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name  ++ " = " ++ prettyLHsType rhs ++ "\n"
+      let synName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
+          tyVarStr = prettyLHsQTyVars tyVar
+          rhsStr = prettyLHsType rhs
+      in "type " ++ synName ++ " " ++ tyVarStr ++ " = " ++ rhsStr ++ "\n"
     -- TODO: ClassDecl
     DataDecl _ name tyVar fix dataDef ->
       let dataName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
@@ -101,7 +106,7 @@ prettyHsBind decl = case decl of
         -- indent = if any hasGuards (map (\(L _ (Match _ c pats body)) -> body ) (unLoc $ mg_alts matches)) then replicate (length funName) ' ' else ""
           -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
     in  unlines matchStrings
-  PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
+  PatBind _ pat rhs _ -> prettyPat pat ++ prettyGRHSs rhs
   VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
   _ -> gshow decl
 
@@ -158,8 +163,11 @@ prettyDerivClauseTys tys = case tys of
 prettyDerivStrategy :: Maybe (LDerivStrategy GhcPs) -> String
 prettyDerivStrategy Nothing = ""
 prettyDerivStrategy (Just (L _ strategy)) = case strategy of
+  StockStrategy _ -> ""
   NewtypeStrategy _ -> "newtype "
-  _ -> "not implemented"
+  AnyclassStrategy _ -> "anyclass "
+  ViaStrategy _ -> "via "
+  -- _ -> "not implemented"
 
  
 prettyLConDecl :: LConDecl GhcPs -> String
@@ -178,7 +186,7 @@ prettyHsConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Locate
 prettyHsConDetails details = case details of
   PrefixCon tyArgs arg -> unwords $ map prettyLHsType $ getLHsTypes arg
   InfixCon (HsScaled _ arg1) (HsScaled _ arg2) -> prettyLHsType arg1 ++ " " ++ prettyLHsType arg2
-  _ -> "Not implemented"
+  _ -> "HsConDetails Not implemented"
 
 
 
@@ -240,7 +248,7 @@ prettyHsType = \case
   -- TODO: HsForAllTy, HsAppKindTy, HsTupleTy, HsSumTy, HsIParamTy, HsStarTy, HsKindSig
   --       HsSpliceTy, HsDocTy, HsBangTy, HsRecTy, HsExplicitListTy, HsExplicitTupleTy, HsTyLit, 
   --       HsWildCardTy
-  _ -> "Not implemented" 
+  _ -> "HsType Not implemented" 
 
 
 
@@ -282,6 +290,9 @@ prettyPat (L _ pat) = case pat of
       PrefixCon _ _ -> conName ++ " " ++ unwords patDetails 
       InfixCon _ _ -> intercalate (" " ++ conName ++ " ") patDetails    -- for : lists (i.e. (x : xs))
       -- TODO: RecCon
+  TuplePat _ pats boxity ->
+    let tupleContent = intercalate ", " (map prettyPat pats)
+    in if isBoxed boxity then "(" ++ tupleContent ++ ")" else "(#" ++ tupleContent ++ "#)"
   _ -> "Not implemented"
 
 
@@ -392,7 +403,16 @@ prettyHsExpr = \case
   HsLet _ tok1 binds tok2 exp -> "\n\tlet\n" ++ indent(indent (prettyLocalBinds binds)) ++ "\tin " ++ prettyHsExpr (unLoc exp)
   -- TODO: HsLam, NegApp, ExplicitTuple, ExplicitSum, HsMultiIf, HsDo, ExplicitList
   -- TODO: others tbd
-  _ -> "Not implemented"
+  ExplicitTuple _ tupleArgs boxity -> 
+    let tupleContent = intercalate ", " (map prettyTupleArg tupleArgs)
+    in if isBoxed boxity then "(" ++ tupleContent ++ ")" else "(#" ++ tupleContent ++ "#)"
+  _ -> "HsExpr Not implemented"
+
+
+prettyTupleArg :: HsTupArg GhcPs -> String
+prettyTupleArg = \case 
+  Present _ expr -> prettyHsExpr (unLoc expr)
+  Missing _ -> "_"
 
 indent :: String -> String
 indent = unlines . map ("\t" ++) . lines

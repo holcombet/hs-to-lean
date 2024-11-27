@@ -24,12 +24,16 @@ extra-source-files: CHANGELOG.md
 library
     exposed-modules:  Test
                     , TestInsertionSort
+                    , TestAST
+                    , HsToLean.HsSimpleAST
                     , HsToLean.TranslateHaskell
                     , HsToLean.SimpleAST
                     , Calendar
                     , StructureAst
                     , TestFunctions
                     , HaskellToHaskell
+
+                    
                     
                     -- , ASTGen
 
