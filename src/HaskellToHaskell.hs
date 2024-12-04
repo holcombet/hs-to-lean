@@ -17,7 +17,7 @@ import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
-import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), isBoxed)
+import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), isBoxed, rdrNameOcc)
 import Data.String (String)
 import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
@@ -170,25 +170,43 @@ prettyDerivStrategy (Just (L _ strategy)) = case strategy of
   -- _ -> "not implemented"
 
  
-prettyLConDecl :: LConDecl GhcPs -> String
-prettyLConDecl (L _ (ConDeclH98 _ name _ _ _ details _)) = 
-  occNameString (occName (unLoc name))++ " " ++ prettyHsConDetails (prettyHsConDeclH98Details details)
+-- prettyLConDecl :: LConDecl GhcPs -> String
+-- prettyLConDecl (L _ (ConDeclH98 _ name _ _ _ details _)) = 
+--   occNameString (occName (unLoc name))++ " " ++ prettyHsConDetails (prettyHsConDeclH98Details details)
 
+prettyLConDecl :: LConDecl GhcPs -> String 
+prettyLConDecl (L _ conDecl) = case conDecl of 
+  ConDeclH98 _ name _ _ _ detail _ -> 
+    occNameString (occName (unLoc name)) ++ " " ++ prettyHsConDetails (prettyHsConDeclH98Details detail)
+  ConDeclGADT _ names _ _ _ typ _ -> 
+    let conNames = intercalate ", " (map (occNameString . occName . unLoc ) names)
+        conType = prettyLHsType typ 
+    in conNames ++ " :: " ++ conType
 
 prettyHsConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
 prettyHsConDeclH98Details details = case details of
   PrefixCon _ args -> PrefixCon [] args
   InfixCon arg1 arg2 -> InfixCon arg1 arg2
-  -- RecCon fields -> RecCon 
+  RecCon (L _ fields) -> RecCon (L noSrcSpan fields) 
 
 
 prettyHsConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> String
 prettyHsConDetails details = case details of
   PrefixCon tyArgs arg -> unwords $ map prettyLHsType $ getLHsTypes arg
   InfixCon (HsScaled _ arg1) (HsScaled _ arg2) -> prettyLHsType arg1 ++ " " ++ prettyLHsType arg2
-  _ -> "HsConDetails Not implemented"
+  RecCon (L _ fields) -> "{" ++ intercalate ", " (map prettyLConDeclField fields) ++ "}"
 
 
+-- Helper functions for RecCon
+prettyLConDeclField :: LConDeclField GhcPs -> String 
+prettyLConDeclField (L _ (ConDeclField _ names typ _)) =
+  let n = map unLoc names
+      name = map getHsFieldOccName n 
+  in intercalate ", " name ++ " :: " ++ prettyLHsType typ 
+
+getHsFieldOccName :: FieldOcc GhcPs -> String 
+getHsFieldOccName x = case x of 
+  FieldOcc _ n -> occNameString (rdrNameOcc (unLoc n))
 
 -------------
 -- HsTypes

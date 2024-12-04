@@ -34,8 +34,21 @@ data Binds
             {
                 fun_name :: String,
                 pat_args :: [Patts],
-                matches :: String   -- not a string, but temp
+                matches :: [MatchPair]   -- not a string, but temp
             }
+    deriving (Eq, Show)
+
+
+data MatchPair = MP {bound_var :: [Patts], guard_body :: GuardRHSs}
+    deriving (Eq, Show)
+
+data GuardRHSs = GuardRHSs {guard_stmt :: [Stmts], loc_binds :: LocBinds}
+    deriving (Eq, Show)
+
+data Stmts = Exprs | LocBinds | Patts deriving (Eq, Show)
+data LocBinds 
+    = EmptyLocBinds 
+    | ValsBinds [Binds] [Sigs]
     deriving (Eq, Show)
 
 
@@ -97,17 +110,40 @@ sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
             retTy = last(processFunType funTy)
-        in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
+            isValBind = head(processFunType funTy) == last(processFunType funTy)
+        -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
+        in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean (getFirstTy (head funTy)) funBind else bindsToLean funBind)
     -- _ -> "Not Implemented"
+
+
+-- functions for value binding functions
+getFirstTy :: Types -> String
+getFirstTy = \case 
+    TypeVar v -> v 
+    AppTy typ1 typ2 -> processType typ1
+
+valBindsToLean :: String -> Binds -> String 
+valBindsToLean ty bind = case bind of 
+    FBind name args match -> ty ++ "  " ++ "" -- intercalate ", " match  -- body not finished... but at least it's something
+-------
+
 
 
 -- tester function to convert Binds type to Lean code
 bindsToLean :: Binds -> String
 bindsToLean = \case
     FBind name args match -> 
-        let matchStmt = "\tmatch " ++ intercalate ", " (processPattArgs args) ++ " " ++ "with\n"
-            matches = match         -- understanding and development of Match under construction
-        in matchStmt ++ "\t\t" ++ matches   -- TODO: figure out indentation
+        -- let matchStmt = "\tmatch " ++ intercalate ", " (processPattArgs args) ++ " " ++ "with\n"
+        --     matches = match         -- understanding and development of Match under construction
+        -- in matchStmt ++ "\t\t" ++ matches   -- TODO: figure out indentation
+        if (null args && length match == 1) || (null args) then "" -- intercalate ", "  match 
+        else 
+            let matchStmt = "\tmatch " ++ intercalate ", " (processPattArgs args) ++ " "  ++ "with\n"
+                matches = ""-- unlines match 
+            in matchStmt ++ "\t\t" ++ matches
+       
+        
+        
 
 
 -- tester function to convert TyClDecls to Lean code
@@ -118,7 +154,9 @@ tyClToLean = \case
             sb = processType body 
         in "abbrev " ++ name ++ " " ++ qtv ++ " := " ++ sb 
     DataDecls defTy name tyVar defnCons deriv -> case defTy of 
-        NewTy -> "Structure Not Implemented"
+        NewTy -> 
+            let consList = ""
+            in ""
         DataTy -> 
             let consList = map getConsDetails defnCons -- list of details of each constructor
                 consNames = map getConsNames defnCons
@@ -250,34 +288,72 @@ generateVarNamesExcluding n exclude = take n $ filter (`notElem` exclude) $ map 
 
 
 main = do
-    let myBinds = FBind {fun_name = "foo", pat_args = [VarPatt "a", VarPatt "b"], matches = "lol"}
+
+    ------------------------------------
+    --  SIGS AND BINDS TESTS
+    ------------------------------------
+
+    let myBinds = FBind {fun_name = "foo", pat_args = [VarPatt "a", VarPatt "b"], matches = []}
     let myTySig = TySig {ty_name = "foo", qual_ty = [], fun_type = [TypeVar "Int", TypeVar "String"], fun_bind = myBinds}
-
-    let testerBinds = FBind {fun_name = "Month", pat_args = [VarPatt "m", VarPatt "startDay", VarPatt "maxDay"], matches = "lol"}
-    let testerTySig = TySig {ty_name = "Month", qual_ty = [], fun_type = [TypeVar "Month", TypeVar "DayOfWeek", TypeVar "Int", TypeVar "String"], fun_bind = testerBinds}
-
-    let testerTypeSyn = SynDecls {syn_name = "Name", qualTy_var = [], syn_body = TypeVar "String"}
-    let testerTypeSyn2 = SynDecls {syn_name = "ResultFunction", qualTy_var = ["a", "b"], syn_body = FunType [TypeVar "a", AppTy (AppTy (TypeVar "Either") (TypeVar "String")) (TypeVar "b")]}
-
-    let testerDataDecl1 = DataDecls {defn_type = DataTy, data_name = "Tree", qualTy_var = ["a"], dataDefn_cons = [DefnConsDetail "Empty" [], DefnConsDetail "Node" [(TypeVar "a"), (AppTy (TypeVar "Tree") (TypeVar "a")), (AppTy (TypeVar "Tree") (TypeVar "a"))]], deriv_clause = []}
-    let testerDataDecl2 = DataDecls {defn_type = DataTy, data_name = "Something", qualTy_var = ["a", "b"], dataDefn_cons = [DefnConsDetail "Blah" [TypeVar "a"], DefnConsDetail "Bleh" [TypeVar "b"]], deriv_clause = []}
     putStrLn $ sigToLean myTySig
     putStrLn "\n"
 
+
+    let testerBinds = FBind {fun_name = "Month", pat_args = [VarPatt "m", VarPatt "startDay", VarPatt "maxDay"], matches = []}
+    let testerTySig = TySig {ty_name = "Month", qual_ty = [], fun_type = [TypeVar "Month", TypeVar "DayOfWeek", TypeVar "Int", TypeVar "String"], fun_bind = testerBinds}
     putStrLn $ sigToLean testerTySig
     putStrLn "\n"
 
-    putStrLn $ tyClToLean testerTypeSyn 
+    let tySig2 = TySig {ty_name = "myId", qual_ty = [], fun_type = [TypeVar "UserId"], fun_bind = FBind {fun_name = "myId", pat_args = [], matches = []}}
+    putStrLn $ sigToLean tySig2 
     putStrLn "\n"
 
+    ------------------------------------
+    -- TYPESYN TESTS (type synonyms)
+    ------------------------------------    
+    
+    -- testing no qualtyvar
+    let testerTypeSyn = SynDecls {syn_name = "Name", qualTy_var = [], syn_body = TypeVar "String"}
+    putStrLn $ tyClToLean testerTypeSyn 
+    putStrLn "\n"    
+
+
+    -- testing multiple qualtyvar and function in syn body
+    let testerTypeSyn2 = SynDecls {syn_name = "ResultFunction", qualTy_var = ["a", "b"], syn_body = FunType [TypeVar "a", AppTy (AppTy (TypeVar "Either") (TypeVar "String")) (TypeVar "b")]}
     putStrLn $ tyClToLean testerTypeSyn2
     putStrLn "\n"
 
+    ------------------------------------
+    --  DATADECLS TESTS
+    ------------------------------------
+
+    -- (data) testing multiple constructor types
+    let testerDataDecl1 = DataDecls {defn_type = DataTy, data_name = "Tree", qualTy_var = ["a"], dataDefn_cons = [DefnConsDetail "Empty" [], DefnConsDetail "Node" [(TypeVar "a"), (AppTy (TypeVar "Tree") (TypeVar "a")), (AppTy (TypeVar "Tree") (TypeVar "a"))]], deriv_clause = []}
     putStrLn $ tyClToLean testerDataDecl1
     putStrLn "\n"
 
+    -- (data) testing multiple parameterized values
+    let testerDataDecl2 = DataDecls {defn_type = DataTy, data_name = "Something", qualTy_var = ["a", "b"], dataDefn_cons = [DefnConsDetail "Blah" [TypeVar "a"], DefnConsDetail "Bleh" [TypeVar "b"]], deriv_clause = []}
     putStrLn $ tyClToLean testerDataDecl2
     putStrLn "\n"
+
+
+    -- (data) testing no parameterized values or constructor types
+    let testerDataDecl3 = DataDecls {defn_type = DataTy, data_name = "Color", qualTy_var =[], dataDefn_cons = [DefnConsDetail "Red" [], DefnConsDetail "Green" [], DefnConsDetail "Blue" []], deriv_clause = []}
+    putStrLn $ tyClToLean testerDataDecl3
+    putStrLn "\n"
+
+
+
+
+
+
+
+
+
+
+
+
 
     
 

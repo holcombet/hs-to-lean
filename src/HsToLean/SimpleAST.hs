@@ -15,7 +15,7 @@ import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
-import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), isBoxed)
+import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), isBoxed, rdrNameOcc)
 import Data.String (String)
 import Data.List (intercalate, isPrefixOf, tails, findIndex, transpose)
 import Data.List.Split (splitOn)
@@ -104,28 +104,53 @@ astHsBind decl = case decl of
     FunBind _ name matches _ -> 
         let funName = "(FunName " ++ (occNameString . occName . unXRec @(GhcPass 'Parsed)) name ++ ")"
             matchStrings = map (\(L _ (Match _ _ pats body)) ->
-                let boundVar = "[" ++ intercalate ", " (map astPat pats) ++ "] "
-                    bodyExpr = "(GRHSs " ++ "Not Implemented" ++ ") "
-                in boundVar ++ bodyExpr ) (unLoc $ mg_alts matches) -- do I need a matches constructor?
+                let boundVar = "(Patts [" ++ intercalate ", " (map astPat pats) ++ "]) "
+                    bodyExpr = "(GRHSs " ++ astGRHSs body ++ ") "
+                in boundVar ++ bodyExpr ) (unLoc $ mg_alts matches) 
 
-            -- matchPats = map (\(L _ (Match _ _ pats body)) -> (map unLoc pats)) (unLoc $ mg_alts matches)
-            -- matchGRHSs = map (\(L _ (Match _ _ _ body)) -> "GRHSs Not Implemented") (unLoc $ mg_alts matches)
+           
             matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
 
             boundVar = filterValidPatt $ boundVarToString $ transposeBoundVar matchLPats
-            -- boundVar = findBoundVar matchLPats
 
-        -- in "FBind " ++ funName ++ " " ++ "[" ++ intercalate ", " matchStrings ++ "] "-- FunBind constructor turned to FBind to avoid name conflicts
         in "FBind " ++ funName ++ " " ++ ("(PatArgs [" ++ intercalate ", " boundVar ++ "]) ") ++ "(Matches " ++ "[ " ++ intercalate ", " matchStrings ++ "]) "  
     PatBind _ pat rhs _ -> "PatBind " ++ "Not Implemented"
     VarBind _ var rhs -> "VarBind " ++ "Not Implemented"
     _ -> "HsBind Not Implemented"
 
 
+
+--------------------------------------------------------------
+-- Functions for GRHSs (for FunBind)
+
+astGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> String 
+astGRHSs (GRHSs _ grhss binds) = "(GuardRHSs [" ++ intercalate ", " (map astGRHS grhss) ++ "]) " ++ "(LBinds " ++ bndr ++ ") " 
+    where
+        bndr = if astLocalBinds binds == "" then "EmptyLocBinds " else "LocalBinds Not Implemented"
+
+
+
+astGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> String 
+astGRHS (L _ (GRHS _ guardStmt body)) =
+    let guardStmts = if null guardStmt then " [] " else ("(Stmts " ++ astGuardStmt guardStmt ++ ") ")
+        exprStr = "(GuardBody " ++ astLHsExpr body ++ ") "
+    in guardStmts ++ exprStr
+
+
+
+astGuardStmt :: [GuardLStmt GhcPs] -> String 
+astGuardStmt stmts = "GuardStmts Not Implemented"
+
+
+astLocalBinds :: HsLocalBinds GhcPs -> String 
+astLocalBinds binds = case binds of 
+    EmptyLocalBinds _ -> ""
+    HsValBinds _ (ValBinds _ bindlst sigs) -> "ValBinds Not Implemented"
+    HsIPBinds _ ipBinds -> "Impliciat Parameter Binds Not Implemented"
 ---------------------------------------------------
 -- Functions to make list of variables for TypeSig
 -- mostly related to FunBind
----------------------------------------------------
+
 
 -- transpose nested list to group naming options from each pattern matching line in function body
 transposeBoundVar :: [[LPat GhcPs]] -> [[LPat GhcPs]]
@@ -221,8 +246,13 @@ astHsDataDefn (HsDataDefn _ nod contxt _ kind cons derv) =
 
 -- for the constructor declarations of data definition
 astLConDecl :: LConDecl GhcPs -> String
-astLConDecl (L _ (ConDeclH98 _ name _ _ _ details _ )) = 
-    "(ConsName " ++ occNameString (occName (unLoc name)) ++ ") " ++ " " ++ astHsConDetails (astHsConDeclH98Details details)
+astLConDecl (L _ conDecl) = case conDecl of 
+    ConDeclH98 _ name _ _ _ detail _ ->
+        "(ConsName " ++ occNameString (occName (unLoc name)) ++ ") " ++ " " ++ astHsConDetails (astHsConDeclH98Details detail)
+    ConDeclGADT _ names _ _ _ typ _ ->
+        let conNames = intercalate ", " (map (occNameString . occName . unLoc) names)
+            conType = astHsType (unLoc typ)
+        in "(ConsName " ++ conNames ++ ") " ++ "(" ++ conType ++ ") "
 
 ---------
 -- helper functions for astLConDecl
@@ -230,11 +260,14 @@ astHsConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScal
 astHsConDeclH98Details details = case details of 
     PrefixCon _ args -> PrefixCon [] args 
     InfixCon arg1 arg2 -> InfixCon arg1 arg2 
+    RecCon (L _ fields) -> RecCon (L noSrcSpan fields)
     -- TODO: RecCon 
 
 astHsConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> String 
 astHsConDetails details = case details of 
     PrefixCon tyArgs arg -> "(ConDetails [" ++ (intercalate ", " $ map astHsType (map unLoc (astGetLHsTypes arg))) ++ "]) "
+    InfixCon (HsScaled _ arg1) (HsScaled _ arg2) -> "InfixCon Not Implemented"
+    RecCon (L _ fields) -> "RecCon Not Implemented"
 
 
 astGetLHsTypes :: [HsScaled GhcPs (LHsType GhcPs)] -> [LHsType GhcPs]
@@ -360,6 +393,25 @@ astConPatDetails :: HsConPatDetails GhcPs -> [String]
 astConPatDetails details = case details of
     PrefixCon tyarg arg -> map astPat arg
     InfixCon arg1 arg2 -> [astPat arg1, astPat arg2]
+
+
+
+-----------------------------------------
+-- Functions for HsExpr
+-----------------------------------------
+
+astLHsExpr :: LHsExpr GhcPs -> String 
+astLHsExpr expr = astHsExpr (unXRec @(GhcPass 'Parsed) expr)
+
+astHsExpr :: HsExpr GhcPs -> String 
+astHsExpr = \case 
+    HsVar _ name -> "(Var " ++ (occNameString . occName . unLoc $ name) ++ ") "
+    OpApp _ expr1 op exp2 -> 
+        let opStr = astLHsExpr op 
+        in "(OperatorApp " ++ opStr ++ " " ++ astLHsExpr expr1 ++ astLHsExpr exp2 ++ ") "
+    _ -> "HsExpr Not Implemented"
+
+
 
 
 

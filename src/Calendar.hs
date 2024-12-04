@@ -1,8 +1,47 @@
 module Calendar where
 
-type Name = String
 
-type ResultFunction a b = a -> Either String b
+
+add arg1 arg2 = arg1 + arg2
+
+-- test recursive guards
+nthElement :: [a] -> Int -> Maybe a 
+nthElement [] a = Nothing
+nthElement (x:xs) a | a <= 0 = Nothing
+                    | a == 1 = Just x
+                    | a > 1 = nthElement xs (a-1)
+                    
+
+newtype UserId = UserId Int         -- newtype no QualTy
+
+myId :: UserId
+myId = UserId 10
+
+
+data Tree a = Empty | Node a (Tree a) (Tree a)      -- data : QualTy and multiple constructor types
+
+exampleTree :: Tree Int
+exampleTree = Node 5 (Node 3 Empty Empty) (Node 8 Empty Empty)
+
+-- Examples of SynDecls
+type Name = String      -- no QualTy, Type only
+
+type ResultFunction a b = a -> Either String b      -- QualTy and function
+
+
+-- Examples of DataDecls
+
+-- data Person = Person { name :: String, age :: Int }  -- data : records
+
+
+data Something a b = Blah a | Bleh b        -- data : QualTy and alternating application to constructors
+
+data Color = Red | Green | Blue         -- data : no QualTy
+
+
+
+
+
 
 -- test case keyword
 pad :: Int -> String
@@ -30,12 +69,7 @@ applyFunc f x = f x
 -- newtype MyType = MyCon (Either String Bool)
 
 
--- test recursive guards
-nthElement :: [a] -> Int -> Maybe a 
-nthElement [] a = Nothing
-nthElement (x:xs) a | a <= 0 = Nothing
-                    | a == 1 = Just x
-                    | a > 1 = nthElement xs (a-1)
+
 
 abc :: Int
 abc = 13

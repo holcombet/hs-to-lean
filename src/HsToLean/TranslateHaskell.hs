@@ -16,7 +16,7 @@ import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
 import "ghc" GHC.Types.SourceFile (HscSource(HsSrcFile))
 import "ghc" GHC.Unit.Module
-import "ghc" GHC.Plugins ( occNameString, HasOccName(occName) )
+import "ghc" GHC.Plugins ( occNameString, HasOccName(occName), rdrNameOcc )
 import Data.String (String)
 import Data.List (intercalate)
 import "ghc" GHC.Types.SourceText
@@ -93,24 +93,44 @@ prettyLeanDeriving :: [LHsDerivingClause GhcPs] -> String
 prettyLeanDeriving clauses = "\tderiving not implemented"
 
 
-prettyLeanLConDecl :: LConDecl GhcPs -> String
-prettyLeanLConDecl (L _ (ConDeclH98 _ name _ _ _ detail _)) =
-    occNameString (occName (unLoc name)) ++ " " ++ prettyLeanConDetails (prettyLeanConDeclH98Details detail)
+-- prettyLeanLConDecl :: LConDecl GhcPs -> String
+-- prettyLeanLConDecl (L _ (ConDeclH98 _ name _ _ _ detail _)) =
+--     occNameString (occName (unLoc name)) ++ " " ++ prettyLeanConDetails (prettyLeanConDeclH98Details detail)
 
+prettyLeanLConDecl :: LConDecl GhcPs -> String 
+prettyLeanLConDecl (L _ conDecl) = case conDecl of 
+    ConDeclH98 _ name _ _ _ detail _ ->
+        occNameString (occName (unLoc name)) ++ " " ++ prettyLeanConDetails (prettyLeanConDeclH98Details detail)
+    ConDeclGADT _ names _ _ _ typ _ ->
+        let conNames = intercalate ", " (map (occNameString . occName . unLoc) names)
+            conType = prettyLLeanType typ 
+        in conNames ++ " : " ++ conType 
 
 prettyLeanConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
 prettyLeanConDeclH98Details details = case details of
     PrefixCon _ args -> PrefixCon [] args
     InfixCon arg1 arg2 -> InfixCon arg1 arg2
+    RecCon (L _ fields) -> RecCon (L noSrcSpan fields)
+    -- RecCon (L _ fields) -> RecCon (L noSrcSpan (map prettyLeanConDeclField fields))
 
 
 prettyLeanConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> String
 prettyLeanConDetails details = case details of
     PrefixCon tyArgs arg -> unwords $ map prettyLLeanType $ getLLeanTypes arg
     InfixCon (HsScaled _ arg1) (HsScaled _ arg2) -> prettyLLeanType arg1 ++ " " ++ prettyLLeanType arg2
-    _ -> "ConDetails Not implemented"
+    RecCon (L _ fields) -> unlines (map prettyLLeanConDeclField fields)
+
+-- this is not correct translation but oh well for now
+prettyLLeanConDeclField :: LConDeclField GhcPs -> String 
+prettyLLeanConDeclField (L _ (ConDeclField _ name typ _)) = 
+    let n = map unLoc name
+        names = map getFieldOccName n
+    in intercalate ", " names ++ " : " ++ prettyLLeanType typ
 
 
+getFieldOccName :: FieldOcc GhcPs -> String 
+getFieldOccName x = case x of 
+    FieldOcc _ n -> occNameString (rdrNameOcc (unLoc n))
 
 ----------------------------------
 -- Functions for Type and SigType
@@ -133,10 +153,16 @@ prettyLLeanSigType arg = prettyLeanSigType (unXRec @(GhcPass 'Parsed) arg)
 
 prettyLeanSigType :: HsSigType GhcPs -> String
 prettyLeanSigType = \case
-    HsSig ext bndrs body -> prettyLLeanType body       
+    HsSig ext bndrs body -> prettyLLeanType body   
+
+
+prettyLLeanBangType :: LBangType GhcPs -> String 
+prettyLLeanBangType (L _ (HsBangTy _ _ typ)) = prettyLLeanType typ 
+prettyLLeanBangType (L _ (HsTupleTy _ _ types)) = "(" ++ intercalate ", " (map prettyLLeanType types) ++ ")"     
 
 prettyLLeanType :: LHsType GhcPs -> String
 prettyLLeanType arg = prettyLeanType (unXRec @(GhcPass 'Parsed) arg)
+
 
 
 prettyLeanType :: HsType GhcPs -> String
