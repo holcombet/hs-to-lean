@@ -1,5 +1,37 @@
+	| arg1, arg2 => arg1 + arg2
+
+def nthElement : List a -> Nat -> Not implemented
+	| [] , a => Nothing
+	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
+
+inductive UserId where
+ 	| UserId Nat
+
+
+def myId : UserId
+	|  => UserId (10)
+
+inductive Tree where
+ 	| Empty 
+	| Node a Not implemented Not implemented
+
+
+def exampleTree : Not implemented
+	|  => Node (5) ( Node (3) Empty Empty ) ( Node (8) Empty Empty )
+
 Syn Not implemented
 Syn Not implemented
+inductive Something where
+ 	| Blah a
+	| Bleh b
+
+
+inductive Color where
+ 	| Red 
+	| Green 
+	| Blue 
+
+
 def pad : Nat -> String
 	| day => Not implemented
 
@@ -17,10 +49,6 @@ def example : MyType -> String
 
 def applyFunc : Not implemented -> Nat -> Nat
 	| f, x => f x
-
-def nthElement : List a -> Nat -> Not implemented
-	| [] , a => Nothing
-	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
 
 def abc : Nat
 	|  => (13)
