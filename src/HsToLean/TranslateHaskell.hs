@@ -45,14 +45,14 @@ prettyLeanDecl = \case
             let dataName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
                 tyVarStr = prettyLLeanQTyVars tyVar
                 dataDefStr = prettyLLeanDataDefn dataDef
-            in "inductive " ++ dataName ++ " where\n " ++ "\t| " ++ dataDefStr
+            in "inductive " ++ dataName ++ " where\n" ++ "| " ++ dataDefStr
         _ -> "TyClD Not implemented"
 
     ValD _ decl -> case decl of
         FunBind _ name matches _ -> 
             let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name
                 matchStrings = map (\(L _ (Match _ c pats body)) ->
-                    let argStrings = "\t| " ++  intercalate ", " (map prettyLeanPat pats)
+                    let argStrings = "| " ++  intercalate ", " (map prettyLeanPat pats)
                         bodyString = prettyLeanGRHSs body
                     in argStrings ++ " => " ++ bodyString) (unLoc $ mg_alts matches)
             in unlines matchStrings
@@ -85,7 +85,7 @@ prettyLLeanTyVar _ = "unknown"
 
 prettyLLeanDataDefn :: HsDataDefn GhcPs -> String
 prettyLLeanDataDefn (HsDataDefn _ _ _ _ kind cons derv) =
-    intercalate "\n\t| " (map prettyLeanLConDecl cons) ++ "\n" ++ deriv ++ "\n"
+    intercalate "\n| " (map prettyLeanLConDecl cons) ++ "\n" ++ deriv ++ "\n"
         where deriv = if not (null derv) then prettyLeanDeriving derv else ""
 
 
