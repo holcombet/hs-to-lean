@@ -32,10 +32,11 @@ import Data.Ratio ((%))
 
 import HsToLean.TranslateHaskell (translateToLean)
 import HsToLean.SimpleAST (generateSimpleAST)
-import HsToLean.HsSimpleAST (cleanAST)
+import HsToLean.ProcessFile (generateIntermediateAST)
 
 import StructureAst (structAst)
 import HaskellToHaskell (translateHaskellToHaskell)
+
 
 
 
@@ -73,17 +74,19 @@ main = do
     
 
       -- following 3 lines for generating AST in .txt and structuring
-      liftIO $ translateToLean astForLean
-      liftIO $ writeFile "AST.txt" (gshow astForLean)
-      liftIO $ structAst "AST.txt"
+      -- liftIO $ translateToLean astForLean
+      -- liftIO $ writeFile "AST.txt" (gshow astForLean)
+      -- liftIO $ structAst "AST.txt"
 
 
       -- make the simple AST
       liftIO $ generateSimpleAST astForLean
+      
+      liftIO $ generateIntermediateAST astForLean
 
 
       -- call HaskellToHaskell
-      liftIO $ translateHaskellToHaskell astForLean
+      -- liftIO $ translateHaskellToHaskell astForLean
 
 
 

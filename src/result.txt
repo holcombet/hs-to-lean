@@ -1,24 +1,3 @@
-	| arg1, arg2 => arg1 + arg2
-
-def nthElement : List a -> Nat -> Not implemented
-	| [] , a => Nothing
-	| (x :: xs), a => Nothing Just x nthElement xs ( a - (1) )
-
-inductive UserId where
- 	| UserId Nat
-
-
-def myId : UserId
-	|  => UserId (10)
-
-inductive Tree where
- 	| Empty 
-	| Node a Not implemented Not implemented
-
-
-def exampleTree : Not implemented
-	|  => Node (5) ( Node (3) Empty Empty ) ( Node (8) Empty Empty )
-
 Syn Not implemented
 Syn Not implemented
 inductive Something where
@@ -32,81 +11,22 @@ inductive Color where
 	| Blue 
 
 
-def pad : Nat -> String
-	| day => Not implemented
+inductive Tree where
+ 	| Empty 
+	| Node a Not implemented Not implemented
 
-def greaterThanZero : Not implemented
-	| x => x > (0)
 
-inductive MyType where
- 	| Foo Nat String
-	| Bar 
-	deriving not implemented
+def add : Nat -> Nat -> Nat
+	| a, b => a + b
 
-def example : MyType -> String
-	| (Foo n s) => s ++ show n
-	| Bar  => Not implemented
-
-def applyFunc : Not implemented -> Nat -> Nat
-	| f, x => f x
+	| a, b => a - b
 
 def abc : Nat
 	|  => (13)
 
-	|  => (10)
+def random : Nat -> List Nat -> Nat
+	| x, []  => x
+	| x, (y :: ys) => x - (1)
 
-Not implemented = Not implemented
-inductive Shape where
- 	| Circle Float Float Float
-	| Rectangle Float Float Float Float
-
-
-def calculateArea : Float -> Float
-	| r => Not implemented
-
-def insert : Nat -> List Nat -> List Nat
-	| x, []  => [x]
-	| x, (y :: ys) => if x < y then x :: y :: ys else y :: insert x ys
-
-def insertionSort : List Nat -> List Nat
-	| [x] => [x]
-	| (x :: xs) => insert x ( insertionSort xs )
-
-def isPrime : Nat -> Bool
-	| n => False not ( hasDivisor (2) )
-
-inductive DayOfWeek where
- 	| Sunday 
-	| Monday 
-	| Tuesday 
-	| Wednesday 
-	| Thursday 
-	| Friday 
-	| Saturday 
-	deriving not implemented
-
-inductive Month where
- 	| January 
-	| February 
-	| March 
-	| April 
-	| May 
-	| June 
-	| July 
-	| August 
-	| September 
-	| October 
-	| November 
-	| December 
-	deriving not implemented
-
-def next : Not implemented
-	| x => minBound succ x
-
-def month : Month -> DayOfWeek -> Nat -> String
-	| m, startDay, maxDay => show m ++ Not implemented ++ week ++ spaces Sunday
-
-	|  => month January Thursday (31) ++ month February Sunday (28) ++ month March Sunday (31) ++ month April Wednesday (30) ++ month May Friday (31) ++ month June Monday (30) ++ month July Wednesday (31) ++ month August Saturday (31) ++ month September Tuesday (30) ++ month October Thursday (31) ++ month November Sunday (30) ++ month December Tuesday (31)
-
-	|  => putStr year
+	|  => putStr Not implemented
 

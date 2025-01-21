@@ -9,6 +9,7 @@ data AST
     = SignatureD Sigs
     | ValueD Binds
     | TyClassD TyClassDecls
+    | EmptyD
     deriving (Eq, Show)
     
 
@@ -33,19 +34,46 @@ data Binds
     =   FBind 
             {
                 fun_name :: String,
-                pat_args :: [Patts],
+                patt_args :: [VarPatt],
                 matches :: [MatchPair]   -- not a string, but temp
             }
     deriving (Eq, Show)
 
 
+-- data MatchPair = MP {bound_var :: [Patts], guard_body :: GuardRHSs}
+--     deriving (Eq, Show)
+
+
+-- temp for testing
 data MatchPair = MP {bound_var :: [Patts], guard_body :: GuardRHSs}
     deriving (Eq, Show)
 
-data GuardRHSs = GuardRHSs {guard_stmt :: [Stmts], loc_binds :: LocBinds}
+-- data GuardRHSs = GuardRHSs {guard_stmt :: [Stmts], guard_expr :: Exprs, loc_binds :: LocBinds}
+--                 | EmptyG
+--     deriving (Eq, Show)
+
+data GuardRHSs = Guards {guard_exprs :: [GuardRHS], loc_binds :: LocBinds}
+                | EmptyG 
     deriving (Eq, Show)
 
-data Stmts = Exprs | LocBinds | Patts deriving (Eq, Show)
+
+data GuardRHS = StmtBody {guard_stmt :: [Stmts], guard_expr :: Exprs}
+    deriving (Eq, Show)
+
+
+data Stmts 
+    = BodyStmts Exprs 
+    | LetStmts LocBinds 
+    | BindStmts Patts Exprs 
+    deriving (Eq, Show)
+
+data Exprs 
+    = Var String 
+    | App Exprs Exprs 
+    | OperApp Exprs Exprs Exprs     -- left expr, operator, right expr
+    | ExpList [Exprs]
+    | Other 
+    deriving (Eq, Show)
 data LocBinds 
     = EmptyLocBinds 
     | ValsBinds [Binds] [Sigs]
@@ -91,17 +119,43 @@ data Types
 
 
 data Patts 
-    = VarPatt String
+    = EmptyP
+    | VariPatt VarPatt
     | ParPatt Patts
+    | ListPatt [Patts]
+    | ConPatt 
+        {
+            con_type :: String,
+            patt_details :: ConPattDetails
+        }
+    deriving (Eq, Show)
+
+type ConPattDetails = ConPDetails 
+
+type VarPatt = String
+data ConPDetails 
+    = ConPattPrefix 
+        {
+            p_arg :: [Patts]
+        }
+    | ConPattInfix
+        {
+            p_arg1 :: VarPatt,
+            p_arg2 :: VarPatt
+        }
     deriving (Eq, Show)
 
 
 
-
-
-
 -- Testing Functions -- 
+astListToLean :: [AST] -> [String]
+astListToLean = map astToLean 
 
+astToLean :: AST -> String 
+astToLean = \case 
+    SignatureD s -> sigToLean s 
+    ValueD v -> bindsToLean v 
+    TyClassD t -> tyClToLean t 
 
 
 -- tester function to convert Sigs type to Lean code
@@ -110,9 +164,11 @@ sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
             retTy = last(processFunType funTy)
-            isValBind = head(processFunType funTy) == last(processFunType funTy)
+            -- isValBind = head(processFunType funTy) == last(processFunType funTy)
+            isValBind = length (processFunType funTy) == 1
         -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
-        in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean (getFirstTy (head funTy)) funBind else bindsToLean funBind)
+        -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean (getFirstTy (head funTy)) funBind else bindsToLean funBind)
+        in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean tyName funBind else bindsToLean funBind)
     -- _ -> "Not Implemented"
 
 
@@ -124,7 +180,7 @@ getFirstTy = \case
 
 valBindsToLean :: String -> Binds -> String 
 valBindsToLean ty bind = case bind of 
-    FBind name args match -> ty ++ "  " ++ "" -- intercalate ", " match  -- body not finished... but at least it's something
+    FBind name args match -> ty ++ if not (null args) then " " ++ intercalate ", " ( args) else ""  ++ " = " ++ unlines (map matchpairToLean match)  -- intercalate ", " match  -- body not finished... but at least it's something
 -------
 
 
@@ -136,14 +192,36 @@ bindsToLean = \case
         -- let matchStmt = "\tmatch " ++ intercalate ", " (processPattArgs args) ++ " " ++ "with\n"
         --     matches = match         -- understanding and development of Match under construction
         -- in matchStmt ++ "\t\t" ++ matches   -- TODO: figure out indentation
-        if (null args && length match == 1) || (null args) then "" -- intercalate ", "  match 
+        if (null args && length match == 1) || (null args) then name ++ " = " ++ unlines ( map matchpairToLean match) -- intercalate ", "  match 
         else 
-            let matchStmt = "\tmatch " ++ intercalate ", " (processPattArgs args) ++ " "  ++ "with\n"
-                matches = ""-- unlines match 
-            in matchStmt ++ "\t\t" ++ matches
+            let matchStmt = "\tmatch " ++ intercalate ", " ( args) ++ " "  ++ "with\n"
+                matches = (map ("| " ++) (map matchpairToLean match))
+            in matchStmt ++ "\t" ++ intercalate "\t" matches
        
         
-        
+matchpairToLean :: MatchPair -> String
+matchpairToLean (MP pvar bod) = 
+    let args = intercalate ", " (processPattArgs pvar)
+        bodystring = guardRHSsToLean bod
+    in args ++ bodystring
+
+
+guardRHSsToLean :: GuardRHSs -> String 
+guardRHSsToLean = \case 
+    EmptyG -> "Guard Not Implemented"
+    Guards gs loc -> 
+        let guards = map guardRHSToLean gs 
+            bndr = if loc == EmptyLocBinds then "" else "local binds not implemented"
+        -- in unlines guards ++ "\n" ++ bndr 
+        in unlines guards ++ if bndr == "" then "" else "\n"
+    
+guardRHSToLean :: GuardRHS -> String 
+guardRHSToLean (StmtBody sm epr) = 
+    let guardStmts = if null sm then " = " else "Lean Guards not Implemented"
+        exprStr = if null sm then processExprs epr else "Lean Guards Not Implemented"
+    in guardStmts ++ exprStr
+
+
 
 
 -- tester function to convert TyClDecls to Lean code
@@ -213,7 +291,7 @@ getBoundVar funTy funBind = thing
     where 
         listTys = init (processFunType funTy)
         listBinds = case funBind of
-            FBind name args match -> processPattArgs args 
+            FBind name args match ->  args 
     
         -- returnTy = last listTys
         -- argty = init listTys
@@ -247,11 +325,32 @@ processFunType = map processType
 
 processPatt :: Patts -> String
 processPatt = \case 
-    VarPatt str -> str 
+    VariPatt p -> p 
     ParPatt par -> "(" ++ processPatt par ++ ")"
+    ListPatt p1 -> "[" ++ intercalate ", " (map processPatt p1) ++ "]"
+    ConPatt ty det -> 
+        let patDetails = getConPattDetails det 
+        in case det of 
+            ConPattPrefix _ -> ty               -- TODO: something might be missing here...
+            ConPattInfix _ _ -> intercalate ty patDetails
 
 processPattArgs :: [Patts] -> [String]
 processPattArgs = map processPatt
+
+
+getConPattDetails :: ConPattDetails -> [String]
+getConPattDetails x = case x of 
+    ConPattPrefix p -> map processPatt p 
+    ConPattInfix a1 a2 -> [ a1,  a2]
+
+
+processExprs :: Exprs -> String 
+processExprs = \case 
+    Var x -> x 
+    App e1 e2 -> processExprs e1 ++ " " ++ processExprs e2 
+    OperApp e1 o e2 -> processExprs e1 ++ " " ++ processExprs o ++ " " ++ processExprs e2 
+    ExpList es -> "[" ++ intercalate ", " (map processExprs es) ++ "]"
+    _ -> "Expr not implemented"
 
 
 
@@ -287,26 +386,112 @@ generateVarNamesExcluding n exclude = take n $ filter (`notElem` exclude) $ map 
 
 
 
+-- tester for iterating over list of Decls
+
+findASTPairs :: [AST] -> [AST]
+findASTPairs [] = []
+findASTPairs [x] = [x]
+findASTPairs (x : xs : ys) = 
+    if isTySig x && isFBind xs then 
+        let ty = toSig x 
+            f = toBinds xs
+            result =     
+                if getSigName ty == getBindName f then 
+                    let combined = ty {fun_bind = f}
+                    in SignatureD combined : findASTPairs ys
+                else (x : xs : findASTPairs ys)
+        in result
+    else (x : xs : findASTPairs ys )
+
+
+isTySig :: AST -> Bool 
+isTySig = \case 
+    SignatureD s -> case s of 
+        TySig ty_name qual_ty fun_type fun_bind -> True 
+    _ -> False
+
+toSig :: AST -> Sigs
+toSig (SignatureD x) = x
+
+getSigName :: Sigs -> String
+getSigName = \case 
+    TySig name _ _ _ -> name 
+    
+
+isFBind :: AST -> Bool 
+isFBind = \case 
+    ValueD v -> case v of 
+        FBind fun_name patt_args matches -> True 
+    _ -> False
+
+toBinds :: AST -> Binds
+toBinds (ValueD x) = x
+
+getBindName :: Binds -> String 
+getBindName = \case 
+    FBind name _ _ -> name
+
+
+
 main = do
 
     ------------------------------------
     --  SIGS AND BINDS TESTS
     ------------------------------------
 
-    let myBinds = FBind {fun_name = "foo", pat_args = [VarPatt "a", VarPatt "b"], matches = []}
+    let emptyBinds = FBind {fun_name = "", patt_args = [], matches = []}
+
+    let funBind2 = ValueD (FBind {fun_name = "random", patt_args = [  "x",  "Not Implemented"], matches = [MP {bound_var = [ VariPatt "x",ConPatt {con_type = "[]", patt_details = ConPattPrefix {p_arg = []}}], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Var "x"}], loc_binds = EmptyLocBinds}},MP {bound_var = [ VariPatt "x", VariPatt "Not Implemented"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Var "x") (Var "-") Other}], loc_binds = EmptyLocBinds}}]})
+
+
+    putStrLn $ astToLean funBind2 
+    putStrLn "\n"
+
+    let funBind3 = ValueD (FBind {fun_name = "abc", patt_args = [], matches = [MP {bound_var = [], guard_body = EmptyG}]})
+    putStrLn $ astToLean funBind3
+    putStrLn "\n"
+
+    -- more complex tests : constructors (Foo and Bar), show type class, etc...
+    let myBinds = FBind {fun_name = "foo", patt_args = [  "a",   "b"], matches = []}
     let myTySig = TySig {ty_name = "foo", qual_ty = [], fun_type = [TypeVar "Int", TypeVar "String"], fun_bind = myBinds}
+    
     putStrLn $ sigToLean myTySig
     putStrLn "\n"
 
+    -- more complex tests : nested function/pattern matching, guards, where clause,  etc...
+    let testerBinds = FBind {fun_name = "Month", patt_args = [  "m",  "startDay",   "maxDay"], matches = []}
+    let testerTySig = TySig {ty_name = "Month", qual_ty = [], fun_type = [TypeVar "Month", TypeVar "DayOfWeek", TypeVar "Int", TypeVar "String"], fun_bind = emptyBinds}
+    let newtesterTySig = testerTySig {fun_bind = testerBinds}
 
-    let testerBinds = FBind {fun_name = "Month", pat_args = [VarPatt "m", VarPatt "startDay", VarPatt "maxDay"], matches = []}
-    let testerTySig = TySig {ty_name = "Month", qual_ty = [], fun_type = [TypeVar "Month", TypeVar "DayOfWeek", TypeVar "Int", TypeVar "String"], fun_bind = testerBinds}
-    putStrLn $ sigToLean testerTySig
+
+    let testDeclList = [SignatureD testerTySig, ValueD testerBinds]
+    let newDeclList =  findASTPairs testDeclList  
     putStrLn "\n"
 
-    let tySig2 = TySig {ty_name = "myId", qual_ty = [], fun_type = [TypeVar "UserId"], fun_bind = FBind {fun_name = "myId", pat_args = [], matches = []}}
+
+    putStrLn $ intercalate "\n" (map astToLean newDeclList)
+
+    putStrLn $ sigToLean newtesterTySig
+    putStrLn "\n"
+
+
+    -- Testing implicit binding
+    let tySig2 = TySig {ty_name = "myId", qual_ty = [], fun_type = [TypeVar "UserId"], fun_bind = FBind {fun_name = "myId", patt_args = [], matches = []}}
     putStrLn $ sigToLean tySig2 
     putStrLn "\n"
+
+    
+    -- simple test : params, grhss, etc
+    let tySig3 = TySig {ty_name = "add", qual_ty = [], fun_type = [TypeVar "Int", TypeVar "Int", TypeVar "Int"], fun_bind = FBind {fun_name = "add", patt_args = [  "a",   "b"], matches = [MP {bound_var = [ VariPatt "a",  VariPatt "b"], guard_body = EmptyG}]}}
+    putStrLn $ sigToLean tySig3 
+    putStrLn "\n"
+
+    putStrLn $ show tySig3 ++ "\n"
+
+
+    -- testing AST generated by ProcessFile
+
+    
 
     ------------------------------------
     -- TYPESYN TESTS (type synonyms)
