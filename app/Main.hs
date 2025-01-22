@@ -75,8 +75,8 @@ main = do
 
       -- following 3 lines for generating AST in .txt and structuring
       -- liftIO $ translateToLean astForLean
-      -- liftIO $ writeFile "AST.txt" (gshow astForLean)
-      -- liftIO $ structAst "AST.txt"
+      liftIO $ writeFile "AST.txt" (gshow astForLean)
+      liftIO $ structAst "AST.txt"
 
 
       -- make the simple AST
@@ -86,7 +86,7 @@ main = do
 
 
       -- call HaskellToHaskell
-      -- liftIO $ translateHaskellToHaskell astForLean
+      liftIO $ translateHaskellToHaskell astForLean
 
 
 

@@ -441,7 +441,7 @@ indent = unlines . map ("\t" ++) . lines
 
 prettyOverLit :: HsOverLit GhcPs -> String
 prettyOverLit (OverLit _ val) = case val of
-  HsIntegral (IL _ _ i) -> gshow i
+  HsIntegral (IL _ _ i) -> show i
   -- TODO: account for negative fractionals
   HsFractional (FL _ neg signi exp expBase) -> --show (fromRational (negate * (signi * (10 ^  exp))))
     -- where negate = if neg then -1 else 1

@@ -1,7 +1,8 @@
 module Calendar where
 
 
-
+frac :: Rational 
+frac = 1 / 2
 
 -- Examples of SynDecls
 type Name = String      -- no QualTy, Type only
@@ -32,10 +33,29 @@ minus a b = a - b
 abc :: Int
 abc = 13
 
-
+{-
+random function contains:
+    - pattern matching
+    - Two parameters
+    - List data type used
+    - operator
+-}
 random :: Int -> [Int] -> Int 
 random x [] = x 
 random x (y : ys) = x - 1
+
+
+{-
+categorizeNumber function contains:
+    - guards (simple)
+-}
+categorizeNumber :: Int -> String
+categorizeNumber x
+  | x < 0     = "Negative"
+  | x == 0    = "Zero"
+  | x < 10    = "Small"
+  | otherwise = "Large"
+
 
 
 --------------------------------------

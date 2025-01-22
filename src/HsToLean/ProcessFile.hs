@@ -38,13 +38,6 @@ import Data.Kind (FUN)
 
 import TestAST
 
-{-
-Reference:
-
-    let tySig3 = TySig {ty_name = "add", qual_ty = [], fun_type = [TypeVar "Int", TypeVar "Int", TypeVar "Int"], fun_bind = FBind {fun_name = "add", pat_args = [VarPatt "a", VarPatt "b"], matches = [MP {bound_var = [VarPatt "a", VarPatt "b"], guard_body = ""}]}}
-    putStrLn $ sigToLean tySig3 
-    putStrLn "\n"
--}
 
 
 ---------------------------------------------------------------------
@@ -98,7 +91,11 @@ constructor checkers
 -}
 
 
--- PATTS
+---------------------------------------------------------------------
+
+{-
+Functions for checking characteristics of objects
+-}
 
 isVarPatt :: Patts -> Bool 
 isVarPatt = \case 
@@ -143,10 +140,16 @@ getVarPattFromPatts = \case
     _ -> ""
 
 
+isFunType :: Types -> Bool 
+isFunType = \case 
+    FType f -> True 
+    _ -> False
+---------------------------------------------------------------------
 ---------------------------------------------------------------------
 
 {- 
-Function that generates the intermediate AST in its entirety
+Trigger function (makes ghc-lib-parser ast, starts translating to 
+                  intermediate ast)
 -}
 
 generateIntermediateAST :: ParsedSource -> IO()
@@ -154,30 +157,115 @@ generateIntermediateAST ast = do
     let ps = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ ast 
         interDecls = map intermediateDecls ps 
         -- sortedDeclList = sortDeclList interDecls 
-    liftIO $ writeFile "IntermediateAST.txt" (unlines $ showIntermediateAST interDecls)
+    liftIO $ writeFile "IntermediateAST.txt" ("[" ++ (intercalate ",\n" $ showIntermediateAST interDecls) ++ "]")
 
 
 showIntermediateAST :: [AST] -> [String]
 showIntermediateAST = map show 
 
 ---------------------------------------------------------------------
+---------------------------------------------------------------------
 
 {-
 Starting translation from ghc-lib-parser AST to intermediate AST
 -}
 
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+HsDecls to AST (intermediateDecls)
+
+Translates HsDecls to AST objects
+-}
+
 intermediateDecls :: HsDecl GhcPs -> AST 
 intermediateDecls = \case 
     ValD _ decl -> intermediateHsBind decl
+    SigD _ decl -> intermediateSig decl
     _ -> EmptyD
 
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+Sig to SignatureD (intermediateSig)
+
+translates Sig to SignatureD
+-}
+
+{- translating Sig to SignatureD-}
+intermediateSig :: Sig GhcPs -> AST 
+intermediateSig decl = case decl of 
+    TypeSig _ names typ -> 
+        let typeName = unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names)
+            sigTypes = intermediateSigType typ
+        in SignatureD (TySig {ty_name = typeName, qual_ty = [], fun_type = sigTypes, fun_bind = EmptyB })
+    _ -> EmptyD
+
+
+intermediateSigType :: LHsSigWcType GhcPs -> [Types]
+intermediateSigType = \case 
+    HsWC ext body -> intermediateHsSigType (unXRec @(GhcPass 'Parsed) body)
+
+intermediateHsSigType :: HsSigType GhcPs -> [Types]
+intermediateHsSigType = \case 
+    HsSig ext bndrs body -> 
+        let tys = intermediateTypes (unLoc body)
+            ls = removeFunTy tys
+            -- l = removeAllFunTy ls
+        in ls
+
+
+
+removeFunTy :: Types -> [Types]
+removeFunTy = \case 
+    FType typ -> typ 
+    TypeVar t -> [TypeVar t]
+
+
+-- removeAllFunTy :: [Types] -> [Types]
+-- removeAllFunTy [] = []
+-- removeAllFunTy (x : xs) =
+--     let result = if isFunType x then removeFunTy x else x 
+--     in result : removeAllFunTy xs
+
+
+-- getFunSig :: HsType GhcPs -> [Types]
+-- getFunSig = \case 
+--     HsFunTy _ _ arg1 arg2 ->
+--         let typList = (unXRec @(GhcPass 'Parsed) arg1) : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
+--         in (map intermediateTypes typList)
+--     _ -> []
+
+intermediateTypes :: HsType GhcPs -> Types 
+intermediateTypes = \case 
+    HsFunTy _ _ arg1 arg2 -> 
+        let typList = (unXRec @(GhcPass 'Parsed) arg1) : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
+        in FType (map intermediateTypes typList)
+    HsTyVar _ _ typ -> TypeVar (occNameString . occName . unLoc $ typ)
+    HsTyLit _ t -> TypeVar "TyLit"
+    _ -> EmptyT
+
+
+extractArgs :: HsType GhcPs -> [HsType GhcPs]
+extractArgs (HsFunTy _ _ arg1 arg2) = unXRec @(GhcPass 'Parsed) arg1 : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
+extractArgs x = [x]
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+HsBind to ValueD (intermediateHsBind)
+
+translates HsBind objects into intermediate ValueD objects
+-}
 intermediateHsBind :: HsBind GhcPs -> AST 
 intermediateHsBind decl = case decl of 
     FunBind _ name matches _ -> 
         let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
             matchPs = map (\(L _ (Match _ _ pats body)) -> 
-                let boundVar = map intermediatePatts pats       -- Patts not implemented
-                    bodyExpr = intermediateGRHSs body       -- GRHSs not implemented
+                let boundVar = map intermediatePatts pats       
+                    bodyExpr = intermediateGRHSs body       
                 in MP {bound_var = boundVar, guard_body = bodyExpr} ) (unLoc $ mg_alts matches)
             
             matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
@@ -203,15 +291,12 @@ boundVarToPatt (x : xs) =
 
 filterValidPatt :: [[Patts]] -> [VarPatt]
 filterValidPatt xs = map chooseVar xs 
--- filterValidPatt [] = []
--- filterValidPatt (x : xs) =
---     if null x then filterValidPatt xs else
---         chooseVar x : filterValidPatt xs 
+
 
 
 chooseVar :: [Patts] -> VarPatt 
 chooseVar [] = ""
-chooseVar (x : xs) -- = if isVarPatt x || isConPattInfix x then x else chooseVar xs 
+chooseVar (x : xs) 
     | isVarPatt x = getVarPattFromPatts x
     | isConPattInfix x = getConPattTail x 
     | otherwise = chooseVar xs 
@@ -226,11 +311,9 @@ findValidPattNames (x : xs) =
     in name : findValidPattNames xs
     
      
-    -- if isVarPatt x || isParPatt x || isConPattInfix x then 
-    --     x : findValidPattNames xs 
-    -- else findValidPattNames xs
 
-----
+---------------------------------------------------------------------
+---------------------------------------------------------------------
 
 
 {-
@@ -250,7 +333,12 @@ intermediateGRHS (L _ (GRHS _ guardStmt body)) =
         exprStr = intermediateLExpr body 
     in StmtBody {guard_stmt = guardStmts, guard_expr =  exprStr}
 
----
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+Exprs
+-}
 
 intermediateLExpr :: LHsExpr GhcPs -> Exprs 
 intermediateLExpr expr = intermediateExpr (unXRec @(GhcPass 'Parsed) expr)
@@ -261,13 +349,23 @@ intermediateExpr = \case
     HsApp _ expr1 expr2 -> App (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc expr2))
     OpApp _ expr1 op expr2 -> OperApp (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc op)) (intermediateExpr (unLoc expr2))
     ExplicitList _ exprs -> ExpList (map intermediateLExpr exprs)
+    HsOverLit _ lit -> Litr (intermediateOverLits lit)
+    HsLit _ lit -> Litr (intermediateLits lit)
     _ -> Other
 
 
+---------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+Patts
+-}
 
 intermediatePatts :: LPat GhcPs -> Patts
 intermediatePatts (L _ pat) = case pat of 
     VarPat _ typ -> VariPatt (occNameString . occName . unLoc $ typ)
+    LitPat _ pat -> LitPatt (intermediateLits pat)
+    NPat _ lit _ _ -> LitPatt (intermediateOverLits (unXRec @(GhcPass 'Parsed) lit))
     ListPat _ pats -> ListPatt (map intermediatePatts pats)
     ConPat _ (L _ name) details -> 
         let conName = occNameString . occName $ name 
@@ -289,3 +387,31 @@ getVarPatt :: LPat GhcPs -> VarPatt
 getVarPatt (L _ pat) = case pat of 
     VarPat _ typ -> occNameString . occName . unLoc $ typ 
     _ -> ""
+
+
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+Lits
+-}
+
+intermediateLits :: HsLit GhcPs -> Lits 
+intermediateLits = \case 
+    HsChar _ chr -> Chars chr 
+    HsString _ str -> Strings (unpackFS str)
+    HsInteger _ i _ -> Ints i
+
+
+intermediateOverLits :: HsOverLit GhcPs -> Lits 
+intermediateOverLits (OverLit _ val) = case val of 
+    HsIntegral (IL _ _ i) -> Ints i 
+    HsFractional (FL _ neg signi exp expBase) ->
+        let sign = if neg then -1 else 1 
+            factor = if exp < 0 then 1 / (10 ^ abs exp) else 10 ^ exp 
+            final = (fromRational (sign * (signi * factor)))
+        in Fractionals final 
+    HsIsString _ s -> Strings (unpackFS s)
+
+---------------------------------------------------------------------
+---------------------------------------------------------------------
