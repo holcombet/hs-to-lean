@@ -94,6 +94,7 @@ prettyHsDecl = \case
   _ -> "Not implemented"
 
 
+
 prettyHsBind :: HsBind GhcPs -> String
 prettyHsBind decl = case decl of
   FunBind _ name matches _ -> 

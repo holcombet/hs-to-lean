@@ -4,6 +4,8 @@
 module TestAST where
 
 import Data.List (intercalate)
+import System.IO
+
 
 data AST 
     = SignatureD Sigs
@@ -23,6 +25,7 @@ data Sigs
                 fun_type :: FunType,
                 fun_bind :: Binds
             }
+    | EmptySig
     deriving (Eq, Show)
 
 
@@ -66,15 +69,28 @@ data Stmts
     = BodyStmts Exprs 
     | LetStmts LocBinds 
     | BindStmts Patts Exprs 
+    | EmptyS
     deriving (Eq, Show)
 
 data Exprs 
     = Var String 
+    | SpecialVar SVar       -- special expressions that need translation b/w Haskell and Lean
     | App Exprs Exprs 
     | OperApp Exprs Exprs Exprs     -- left expr, operator, right expr
+    | LetExpr LocBinds Exprs
     | ExpList [Exprs]
     | Litr Lits
-    | Other 
+    | Other
+    deriving (Eq, Show)
+
+data SVar 
+    = VPutStrLn
+    | VPutStr
+    | VNothing 
+    | VJust
+    | VLeft
+    | VRight
+    | EmptyV 
     deriving (Eq, Show)
 data LocBinds 
     = EmptyLocBinds 
@@ -82,6 +98,15 @@ data LocBinds
     deriving (Eq, Show)
 
 
+data Bindings 
+    = FBinding 
+        {
+            f_name :: String,
+            f_args :: [VarPatt],
+            f_matches :: [MatchPair]
+        }
+    | EmptyBinding
+    deriving (Eq, Show)
 
 data TyClassDecls 
     = SynDecls
@@ -98,6 +123,7 @@ data TyClassDecls
             dataDefn_cons   :: [DefnConsDetails],
             deriv_clause    :: [Types]
         }
+    | EmptyTC
     deriving (Eq, Show)
 
 
@@ -115,12 +141,26 @@ type ConsDetails = [Types]
 
 data Types 
     = TypeVar String
+    | FunVar FVar               -- built-in function/monad that has diff name/operation
     | FType FunType
     | AppTy Types Types
+    | ExpListTy [Types]
+    | ListTy Types
+    | ParaTy Types
     | EmptyT        -- placeholder
     deriving (Eq, Show)
 
-type TVar = String
+data FVar 
+    = LRational     
+    | LEither
+    -- | LLeft 
+    -- | LRight
+    | LMaybe
+    | LAlphaA
+    -- | LJust
+    -- | LNothing
+    | LEmpty   -- placeholder
+    deriving (Eq, Show)
 data Patts 
     = EmptyP
     | VariPatt VarPatt
@@ -154,7 +194,7 @@ data Lits
     = Chars Char 
     | Strings String 
     | Ints Integer
-    | Fractionals Double
+    | Fractionals Float
     deriving (Eq, Show)
 
 
@@ -165,7 +205,7 @@ astListToLean = map astToLean
 astToLean :: AST -> String 
 astToLean = \case 
     SignatureD s -> sigToLean s 
-    ValueD v -> bindsToLean v 
+    ValueD v -> implicitBindsToLean v 
     TyClassD t -> tyClToLean t 
     _ -> ""
 
@@ -200,23 +240,33 @@ valBindsToLean ty bind = case bind of
 
 -------
 
-
+implicitBindsToLean :: Binds -> String 
+implicitBindsToLean = \case 
+    FBind name args match -> 
+        -- if length match == 1  then unlines ( map singleMatchPairToLean match)
+        "def " ++ name ++ " " ++ unwords args ++ " := " ++ unlines (map singleMatchPairToLean match)
+    _ -> ""
 
 -- tester function to convert Binds type to Lean code
 bindsToLean :: Binds -> String
 bindsToLean = \case
     FBind name args match -> 
-        -- let matchStmt = "\tmatch " ++ intercalate ", " (processPattArgs args) ++ " " ++ "with\n"
-        --     matches = match         -- understanding and development of Match under construction
-        -- in matchStmt ++ "\t\t" ++ matches   -- TODO: figure out indentation
-        -- if (null args && length match == 1) || (null args) then unlines ( map matchpairToLean match) -- intercalate ", "  match 
-        if (null args || length match == 1)  then unlines ( map matchpairToLean match) -- intercalate ", "  match 
+        
+        -- if (null args || length match == 1)  then unlines ( map matchpairToLean match) -- intercalate ", "  match 
+        if length match == 1  then unlines ( map singleMatchPairToLean match)
         else 
             let matchStmt = "\tmatch " ++ intercalate ", " ( args) ++ " "  ++ "with\n"
                 matches = (map ("| " ++) (map matchpairToLean match))
             in matchStmt ++ "\t" ++ intercalate "\t" matches
     _ -> ""
        
+{-
+For let statements
+-}
+bindingsToLean :: Binds -> String 
+bindingsToLean = \case 
+    FBind name a e -> name ++" := " ++ unwords (map singleMatchPairToLean e)
+    _ -> "Bindings Not Implemented" 
 
 {-
 getConstantFunBody, getFunBody, and getConst
@@ -236,6 +286,41 @@ getConst (StmtBody sm expr) = processExprs expr
         
 
 {-
+singleMatchpairToLean, singleGuardRHSsToLean, and singleGuardRHSToLean 
+
+functions for getting guard body for constant functions
+-}
+
+singleMatchPairToLean :: MatchPair -> String 
+singleMatchPairToLean (MP pvar bod) =
+    let bodyString = singleGuardRHSsToLean bod 
+    in bodyString 
+
+singleGuardRHSsToLean :: GuardRHSs -> String 
+singleGuardRHSsToLean = \case 
+    EmptyG -> "Guard Not Implemented"
+    Guards gs loc ->
+            let guards = map singleGuardRHSToLean gs
+                bndr = if loc == EmptyLocBinds then "" else "local binds no implemented"
+                -- trimGuardsExpr = words (unlines guards)
+            -- in (if tail (unwords trimGuardsExpr) == "else" then init (unwords trimGuardsExpr) else unlines guards) ++ if bndr == "" then "" else "\n"
+            in unlines guards ++ if bndr == "" then "" else "\n"
+
+singleGuardRHSToLean :: GuardRHS -> String 
+singleGuardRHSToLean (StmtBody sm epr) = 
+    let guardStmts = if null sm then "" else 
+            let stm = guardStmtsToLean sm 
+            in if stm == "" then "" else stm ++ " then "
+        exprStr = if null sm then processExprs epr else 
+            let ex = processExprs epr 
+            in if guardStmts == "" then "\t" ++ ex else ex ++ " else"
+
+            -- if tail (words exprStr) == "else" then unwords (init )
+    -- in guardStmts ++ if unwords (tail trimExprStr) == " else" then unwords (init trimExprStr) else exprStr
+    in guardStmts ++ exprStr
+
+
+{-
 matchpairToLean, guardRHSsToLean, and guardRHSToLean 
 
 functions for getting guard body for non-constant functions
@@ -248,22 +333,72 @@ matchpairToLean (MP pvar bod) =
     in args ++ bodystring
 
 
+
+
+{- works but adds an unwanted "else" if no otherwise-}
 guardRHSsToLean :: GuardRHSs -> String 
 guardRHSsToLean = \case 
     EmptyG -> "Guard Not Implemented"
     Guards gs loc -> 
         let guards = map guardRHSToLean gs 
+            guardEnd = words  (last guards)
             bndr = if loc == EmptyLocBinds then "" else "local binds not implemented"
-        -- in unlines guards ++ "\n" ++ bndr 
-        in unlines guards ++ if bndr == "" then "" else "\n"
+        in " => " ++ if last guardEnd == "else" then unlines (init guards) ++ "\t\t\t" ++ unwords (init guardEnd) else unlines guards ++ if bndr == "" then "" else "\n"
+        -- in " => " ++ unlines guards ++ if bndr == "" then "" else "\n"
     
 guardRHSToLean :: GuardRHS -> String 
 guardRHSToLean (StmtBody sm epr) = 
-    let guardStmts = if null sm then " => " else "Lean Guards not Implemented"
-        exprStr = if null sm then processExprs epr else "Lean Guards Not Implemented"
+    let guardStmts = if null sm then "" else --if null sm then " => " else --"Lean Guards not Implemented"
+            let stm = guardStmtsToLean sm 
+            in "\n\t\t" ++ if null stm ||  stm == "" then "" else stm ++ " then "
+        exprStr = if null sm then processExprs epr else --"Lean Guards Not Implemented"
+            let ex = processExprs epr 
+            in if guardStmts == "" then "\t" ++ ex else ex ++ " else"
     in guardStmts ++ exprStr
+{--}
 
 
+{-
+guardStmtsToLean
+
+Converting guard stmts to lean (if statements)
+-}
+
+guardStmtsToLean :: [Stmts] -> String
+guardStmtsToLean sts = intercalate ", " (map guardStmtToLean sts)
+
+guardStmtToLean :: Stmts -> String 
+guardStmtToLean = \case 
+    BodyStmts e -> -- "if " ++ processExprs e 
+        let exp = processExprs e 
+        in if exp == "otherwise" then "" else "\tif " ++ exp
+    LetStmts l -> "Let Stmt not implemented"
+    BindStmts b e -> "Bind Stmt not implemented"
+    EmptyS -> "Stmt not implemented"
+
+
+{-
+locBindsToLean
+
+Converting local binds to Lean binding stmts/exprs
+-}
+
+processLocBindsToLean :: LocBinds -> String
+processLocBindsToLean bind = case bind of 
+    EmptyLocBinds -> ""
+    ValsBinds bndlst sig -> 
+        let bindlst =  map bindingsToLean bndlst
+            sigs = map sigToLean sig 
+            -- s = if null sigs then 
+        in unlines bindlst ++ unlines sigs
+        -- let bindlst = map bindingsToLean bndlst
+        --     sigs = map sigToLean sig
+        -- -- in  (intercalate "" bindlst) ++ unlines sigs
+        -- in [unwords bindlst, unlines sigs]
+    
+
+---------------------------------------------------------------
+---------------------------------------------------------------
 
 
 -- tester function to convert TyClDecls to Lean code
@@ -284,6 +419,7 @@ tyClToLean = \case
                 consLines = map (\s ->  s ++ recursEnd ) (map (getDefnCons tyVar) defnCons)
             in "inductive " ++ name ++ (if not (null tyVar) then " " ++ unwords (formatParameterizedQTyVar tyVar) else "") ++ " where\n" ++ intercalate "\n" (map ("| "++) consLines)
             -- UNFINISHED
+    _ -> "TyClassDecls Not Implemented"
 
 -- returns just the constructor details
 getConsDetails :: DefnConsDetails -> [Types]
@@ -355,9 +491,23 @@ unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
 
 processType :: Types -> String
 processType = \case
-    TypeVar str -> str
+    TypeVar str ->  str
+    FunVar f -> case f of 
+        LRational -> "Float"
+        LEither -> "Except"
+        -- LLeft -> "Except.error"
+        -- LRight -> "Except.ok"
+        LMaybe -> "Option"
+        -- LJust -> "some"
+        -- LNothing -> "none"
+        LAlphaA -> "α"
+        _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
     AppTy ty1 ty2 -> processType ty1 ++ " " ++ processType ty2
+        -- let p1 = processType1
+    ExpListTy l -> "[" ++ intercalate ", " (map processType l) ++ "]"
+    ListTy t -> "List " ++ processType t
+    ParaTy t -> "(" ++ processType t ++ ")"
     -- _ -> "Type not implemented"
     EmptyT -> "Type Not Implemented"
 
@@ -387,9 +537,10 @@ processPatt = \case
     ListPatt p1 -> "[" ++ intercalate ", " (map processPatt p1) ++ "]"
     ConPatt ty det -> 
         let patDetails = getConPattDetails det 
+            con_ty = if ty == ":" then " :: " else ty
         in case det of 
-            ConPattPrefix _ -> ty               -- TODO: something might be missing here...
-            ConPattInfix _ _ -> intercalate ty patDetails
+            ConPattPrefix _ -> con_ty               -- TODO: something might be missing here...
+            ConPattInfix _ _ -> intercalate con_ty patDetails
     LitPatt l -> processLits l 
 
 processPattArgs :: [Patts] -> [String]
@@ -406,14 +557,45 @@ getConPattDetails x = case x of
 
 {- Functions for Exprs -}
 
+{-
+unzipBindTyList :: [(String, String)] -> [String]
+unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
+-}
+
 processExprs :: Exprs -> String 
 processExprs = \case 
     Var x -> x 
+    SpecialVar x -> case x of 
+        VPutStrLn -> "IO.println"
+        VPutStr -> "IO.print"
+        VJust -> "some"
+        VNothing -> "none"
+        _ -> "Special Expr Not Implemented"
     App e1 e2 -> processExprs e1 ++ " " ++ processExprs e2 
     OperApp e1 o e2 -> processExprs e1 ++ " " ++ processExprs o ++ " " ++ processExprs e2 
+    LetExpr bind exp -> 
+        -- let bndrs = unzipLocBindsToBinds (processLocBindsToLean bind)
+        let bndrs = removeEmptyStrFromList $ lines (processLocBindsToLean bind)
+            exps = processExprs exp
+        in unlines ( map ("\tlet "++)  bndrs )++ "\t(" ++ exps ++ ")"
+        -- in show bndrs ++ " " ++ "\n\t(" ++ exps ++ ")"
     ExpList es -> "[" ++ intercalate ", " (map processExprs es) ++ "]"
     Litr l -> processLits l
+    -- If 
+    -- Par 
+    -- Explicit Tuple
     _ -> "Expr not implemented"
+
+
+{-
+Removes empty strings from list to prevent extra newlines
+-}
+removeEmptyStrFromList :: [String] -> [String]
+removeEmptyStrFromList [] = []
+removeEmptyStrFromList (x : xs)
+    | x == "" = removeEmptyStrFromList xs 
+    | otherwise = x : removeEmptyStrFromList xs
+
 
 
 ---------------------------------------------------------------
@@ -424,7 +606,7 @@ processExprs = \case
 processLits :: Lits -> String 
 processLits = \case 
     Chars c -> show c 
-    Strings s -> s 
+    Strings s -> "\"" ++ s ++ "\"" 
     Ints i -> show i 
     Fractionals f -> show f
 
@@ -557,7 +739,7 @@ getBindName = \case
 
 
 main = do
-
+    hSetEncoding stdout utf8
     ------------------------------------
     --  SIGS AND BINDS TESTS
     ------------------------------------
@@ -580,30 +762,48 @@ main = do
 
     let funBind7 = ValueD (FBind {fun_name = "categorizeNumber", patt_args = ["x"], matches = [MP {bound_var = [VariPatt "x"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Negative")},StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Zero")},StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Small")},StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Large")}], loc_binds = EmptyLocBinds}}]})
 
+    let testerTypeSyn2 = SynDecls {syn_name = "ResultFunction", qualTy_var = ["a", "b"], syn_body = FType [TypeVar "a", AppTy (AppTy (TypeVar "Either") (TypeVar "String")) (TypeVar "b")]}
+    putStrLn $ tyClToLean testerTypeSyn2
+    putStrLn "\n"
 
-    let bindList = findASTPairs [SignatureD (TySig {ty_name = "frac", qual_ty = [], fun_type = [TypeVar "Rational"], fun_bind = EmptyB}),
+    let bindList = findASTPairs [SignatureD (TySig {ty_name = "frac", qual_ty = [], fun_type = [FunVar LRational], fun_bind = EmptyB}),
                                 ValueD (FBind {fun_name = "frac", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Litr (Ints 1)) (Var "/") (Litr (Ints 2))}], loc_binds = EmptyLocBinds}}]}),
-                                EmptyD,
-                                EmptyD,
-                                EmptyD,
-                                EmptyD,
-                                EmptyD,
+                                TyClassD (SynDecls {syn_name = "Name", qualTy_var = [], syn_body = TypeVar "String"}),
+                                TyClassD (SynDecls {syn_name = "ResultFunction", qualTy_var = ["a","b"], syn_body = FType [FunVar LAlphaA,AppTy (AppTy (FunVar LEither) (TypeVar "String")) (TypeVar "b")]}),
+                                TyClassD (DataDecls {defn_type = DataTy, data_name = "Something", qualTy_var = ["a","b"], dataDefn_cons = [DefnConsDetail "Blah" [FunVar LAlphaA],DefnConsDetail "Bleh" [TypeVar "b"]], deriv_clause = []}),
+                                TyClassD (DataDecls {defn_type = DataTy, data_name = "Color", qualTy_var = [], dataDefn_cons = [DefnConsDetail "Red" [],DefnConsDetail "Green" [],DefnConsDetail "Blue" []], deriv_clause = []}),
+                                TyClassD (DataDecls {defn_type = DataTy, data_name = "Tree", qualTy_var = ["a"], dataDefn_cons = [DefnConsDetail "Empty" [],DefnConsDetail "Node" [FunVar LAlphaA,ParaTy (AppTy (TypeVar "Tree") (FunVar LAlphaA)),ParaTy (AppTy (TypeVar "Tree") (FunVar LAlphaA))]], deriv_clause = []}),
                                 SignatureD (TySig {ty_name = "add", qual_ty = [], fun_type = [TypeVar "Int",TypeVar "Int",TypeVar "Int"], fun_bind = EmptyB}),
                                 ValueD (FBind {fun_name = "add", patt_args = ["a","b"], matches = [MP {bound_var = [VariPatt "a",VariPatt "b"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Var "a") (Var "+") (Var "b")}], loc_binds = EmptyLocBinds}}]}),
                                 ValueD (FBind {fun_name = "minus", patt_args = ["a","b"], matches = [MP {bound_var = [VariPatt "a",VariPatt "b"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Var "a") (Var "-") (Var "b")}], loc_binds = EmptyLocBinds}}]}),
                                 SignatureD (TySig {ty_name = "abc", qual_ty = [], fun_type = [TypeVar "Int"], fun_bind = EmptyB}),
                                 ValueD (FBind {fun_name = "abc", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Litr (Ints 13)}], loc_binds = EmptyLocBinds}}]}),
-                                SignatureD (TySig {ty_name = "random", qual_ty = [], fun_type = [TypeVar "Int",EmptyT,TypeVar "Int"], fun_bind = EmptyB}),
+                                SignatureD (TySig {ty_name = "random", qual_ty = [], fun_type = [TypeVar "Int",ListTy (TypeVar "Int"),TypeVar "Int"], fun_bind = EmptyB}),
                                 ValueD (FBind {fun_name = "random", patt_args = ["x","ys"], matches = [MP {bound_var = [VariPatt "x",ConPatt {con_type = "[]", patt_details = ConPattPrefix {p_arg = []}}], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Var "x"}], loc_binds = EmptyLocBinds}},MP {bound_var = [VariPatt "x",ParPatt (ConPatt {con_type = ":", patt_details = ConPattInfix {p_arg1 = "y", p_arg2 = "ys"}})], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Var "x") (Var "-") (Litr (Ints 1))}], loc_binds = EmptyLocBinds}}]}),
                                 SignatureD (TySig {ty_name = "categorizeNumber", qual_ty = [], fun_type = [TypeVar "Int",TypeVar "String"], fun_bind = EmptyB}),
-                                ValueD (FBind {fun_name = "categorizeNumber", patt_args = ["x"], matches = [MP {bound_var = [VariPatt "x"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Negative")},StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Zero")},StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Small")},StmtBody {guard_stmt = [], guard_expr = Litr (Strings "Large")}], loc_binds = EmptyLocBinds}}]}),
-                                ValueD (FBind {fun_name = "main", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = App (Var "putStr") (Litr (Strings "Hello World"))}], loc_binds = EmptyLocBinds}}]})]
+                                ValueD (FBind {fun_name = "categorizeNumber", patt_args = ["x"], matches = [MP {bound_var = [VariPatt "x"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [BodyStmts (OperApp (Var "x") (Var "<") (Litr (Ints 0)))], guard_expr = Litr (Strings "Negative")},StmtBody {guard_stmt = [BodyStmts (OperApp (Var "x") (Var "==") (Litr (Ints 0)))], guard_expr = Litr (Strings "Zero")},StmtBody {guard_stmt = [BodyStmts (OperApp (Var "x") (Var "<") (Litr (Ints 10)))], guard_expr = Litr (Strings "Small")},StmtBody {guard_stmt = [BodyStmts (Var "otherwise")], guard_expr = Litr (Strings "Large")}], loc_binds = EmptyLocBinds}}]}),
+                                SignatureD (TySig {ty_name = "calculateArea", qual_ty = [], fun_type = [TypeVar "Float",TypeVar "Float"], fun_bind = EmptyB}),
+                                ValueD (FBind {fun_name = "calculateArea", patt_args = ["r"], matches = [MP {bound_var = [VariPatt "r"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = LetExpr (ValsBinds [FBind {fun_name = "pi", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Litr (Fractionals 3.14)}], loc_binds = EmptyLocBinds}}]}] []) (OperApp (OperApp (Var "pi") (Var "*") (Var "r")) (Var "*") (Var "r"))}], loc_binds = EmptyLocBinds}}]}),
+                                SignatureD (TySig {ty_name = "calculateRandom", qual_ty = [], fun_type = [TypeVar "Int",TypeVar "Int"], fun_bind = EmptyB}),
+                                ValueD (FBind {fun_name = "calculateRandom", patt_args = ["x"], matches = [MP {bound_var = [VariPatt "x"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = LetExpr (ValsBinds [FBind {fun_name = "y", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Litr (Ints 10)}], loc_binds = EmptyLocBinds}}]},FBind {fun_name = "z", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = Litr (Ints 2)}], loc_binds = EmptyLocBinds}}]}] []) (OperApp (OperApp (Var "x") (Var "+") (Var "y")) (Var "+") (Var "z"))}], loc_binds = EmptyLocBinds}}]}),
+                                SignatureD (TySig {ty_name = "nthElement", qual_ty = [], fun_type = [ListTy (FunVar LAlphaA),TypeVar "Int",AppTy (FunVar LMaybe) (FunVar LAlphaA)], fun_bind = EmptyB}),
+                                ValueD (FBind {fun_name = "nthElement", patt_args = ["xs","a"], matches = [MP {bound_var = [ConPatt {con_type = "[]", patt_details = ConPattPrefix {p_arg = []}},VariPatt "a"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = SpecialVar VNothing}], loc_binds = EmptyLocBinds}},MP {bound_var = [ParPatt (ConPatt {con_type = ":", patt_details = ConPattInfix {p_arg1 = "x", p_arg2 = "xs"}}),VariPatt "a"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [BodyStmts (OperApp (Var "a") (Var "<=") (Litr (Ints 0)))], guard_expr = SpecialVar VNothing},StmtBody {guard_stmt = [BodyStmts (OperApp (Var "a") (Var "==") (Litr (Ints 1)))], guard_expr = App (SpecialVar VJust) (Var "x")},StmtBody {guard_stmt = [BodyStmts (OperApp (Var "a") (Var ">") (Litr (Ints 1)))], guard_expr = App (App (Var "nthElement") (Var "xs")) Other}], loc_binds = EmptyLocBinds}}]}),
+                                ValueD (FBind {fun_name = "main", patt_args = [], matches = [MP {bound_var = [], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = App (SpecialVar VPutStr) (Litr (Strings "Hello World"))}], loc_binds = EmptyLocBinds}}]})]
     
-    putStrLn $ show bindList
+
+    -- putStrLn $ show bindList
 
     putStrLn "\n\n\n"
     
-    putStrLn $ intercalate "\n" (astListToLean bindList)
+    putStrLn $ intercalate "\n\n" (astListToLean bindList)
+
+    putStrLn "\n\n"
+
+    
+    
+    -- Print Unicode characters
+    -- putStrLn "This is a Unicode character: α"
+   
 
 
 
@@ -615,4 +815,3 @@ main = do
 
     
 
-    putStrLn "Hello World"

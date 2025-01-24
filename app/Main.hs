@@ -28,11 +28,14 @@ import Data.Bool (Bool)
 import "ghc" GHC.Data.Bag (bagToList, Bag)
 import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
+import System.IO
 
 
 import HsToLean.TranslateHaskell (translateToLean)
 import HsToLean.SimpleAST (generateSimpleAST)
 import HsToLean.ProcessFile (generateIntermediateAST)
+
+-- import TestAST 
 
 import StructureAst (structAst)
 import HaskellToHaskell (translateHaskellToHaskell)
@@ -61,10 +64,10 @@ main = do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags
-      target <- guessTarget "src/Calendar.hs" Nothing (Just (Cpp HsSrcFile))
+      target <- guessTarget "src/TestFunctions.hs" Nothing (Just (Cpp HsSrcFile))
       setTargets [target]
       load LoadAllTargets
-      let moduleName = takeBaseName "src/Calendar.hs"
+      let moduleName = takeBaseName "src/TestFunctions.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
 
@@ -87,7 +90,6 @@ main = do
 
       -- call HaskellToHaskell
       liftIO $ translateHaskellToHaskell astForLean
-
 
 
 

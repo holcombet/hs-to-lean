@@ -22,13 +22,10 @@ maintainer:         74029138+holcombet@users.noreply.github.com
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules:  Test
-                    , TestInsertionSort
-                    , TestAST
+    exposed-modules: TestAST
                     , HsToLean.TranslateHaskell
                     , HsToLean.SimpleAST
                     , HsToLean.ProcessFile
-                    , Calendar
                     , StructureAst
                     , TestFunctions
                     , HaskellToHaskell

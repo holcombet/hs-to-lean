@@ -34,7 +34,7 @@ import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
 import GHC.Base (String)
 import Data.Kind (FUN)
-
+import System.IO
 
 import TestAST
 
@@ -159,7 +159,6 @@ generateIntermediateAST ast = do
         -- sortedDeclList = sortDeclList interDecls 
     liftIO $ writeFile "IntermediateAST.txt" ("[" ++ (intercalate ",\n" $ showIntermediateAST interDecls) ++ "]")
 
-
 showIntermediateAST :: [AST] -> [String]
 showIntermediateAST = map show 
 
@@ -183,6 +182,7 @@ intermediateDecls :: HsDecl GhcPs -> AST
 intermediateDecls = \case 
     ValD _ decl -> intermediateHsBind decl
     SigD _ decl -> intermediateSig decl
+    TyClD _ decl -> intermediateTyClDecl decl 
     _ -> EmptyD
 
 ---------------------------------------------------------------------
@@ -196,13 +196,21 @@ translates Sig to SignatureD
 
 {- translating Sig to SignatureD-}
 intermediateSig :: Sig GhcPs -> AST 
-intermediateSig decl = case decl of 
+intermediateSig decl = SignatureD (intermediateSigToSigs decl)             --case decl of 
+    -- TypeSig _ names typ -> 
+    --     -- let typeName = unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names)
+    --     --     sigTypes = intermediateSigType typ
+    --     -- in SignatureD (TySig {ty_name = typeName, qual_ty = [], fun_type = sigTypes, fun_bind = EmptyB })
+    -- _ -> EmptyD
+
+
+intermediateSigToSigs :: Sig GhcPs -> Sigs 
+intermediateSigToSigs decl = case decl of 
     TypeSig _ names typ -> 
         let typeName = unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names)
-            sigTypes = intermediateSigType typ
-        in SignatureD (TySig {ty_name = typeName, qual_ty = [], fun_type = sigTypes, fun_bind = EmptyB })
-    _ -> EmptyD
-
+            sigTypes = intermediateSigType typ 
+        in TySig {ty_name = typeName, qual_ty = [], fun_type = sigTypes, fun_bind = EmptyB}
+    _ -> EmptySig
 
 intermediateSigType :: LHsSigWcType GhcPs -> [Types]
 intermediateSigType = \case 
@@ -222,31 +230,45 @@ removeFunTy :: Types -> [Types]
 removeFunTy = \case 
     FType typ -> typ 
     TypeVar t -> [TypeVar t]
+    ListTy l -> [ListTy l]
+    AppTy f x-> [AppTy f x]
+    ExpListTy l -> [ExpListTy l]
+    FunVar f -> [FunVar f]
 
-
--- removeAllFunTy :: [Types] -> [Types]
--- removeAllFunTy [] = []
--- removeAllFunTy (x : xs) =
---     let result = if isFunType x then removeFunTy x else x 
---     in result : removeAllFunTy xs
-
-
--- getFunSig :: HsType GhcPs -> [Types]
--- getFunSig = \case 
---     HsFunTy _ _ arg1 arg2 ->
---         let typList = (unXRec @(GhcPass 'Parsed) arg1) : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
---         in (map intermediateTypes typList)
---     _ -> []
 
 intermediateTypes :: HsType GhcPs -> Types 
 intermediateTypes = \case 
     HsFunTy _ _ arg1 arg2 -> 
         let typList = (unXRec @(GhcPass 'Parsed) arg1) : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
         in FType (map intermediateTypes typList)
-    HsTyVar _ _ typ -> TypeVar (occNameString . occName . unLoc $ typ)
+    HsTyVar _ _ typ -> --TypeVar (occNameString . occName . unLoc $ typ)
+        let var = (occNameString . occName . unLoc $ typ)
+        in intermediateDecideTypes var
+    HsAppTy _ typ1 typ2 -> AppTy (intermediateTypes $ unLoc typ1) (intermediateTypes $ unLoc typ2)
+    HsExplicitListTy _ _ ls -> ExpListTy (map intermediateTypes (map unLoc ls))
+    HsListTy _ typ -> ListTy (intermediateTypes (unLoc typ))
+    HsParTy _ typ -> ParaTy (intermediateTypes (unLoc typ))
     HsTyLit _ t -> TypeVar "TyLit"
     _ -> EmptyT
 
+
+{-
+intermediateDecideTypes
+
+Function that translates Haskell functions/monads to Lean equivalent if names are not the same
+(does not inlcude types)
+-}
+intermediateDecideTypes :: String -> Types 
+intermediateDecideTypes x 
+    | x == "Rational" = FunVar LRational
+    | x == "Either" = FunVar LEither 
+    -- | x == "Left" = FunVar LLeft 
+    -- | x == "Right" = FunVar LRight 
+    | x == "Maybe" = FunVar LMaybe 
+    -- | x == "Just" = FunVar LJust 
+    -- | x == "Nothing" = FunVar LNothing 
+    | x == "a" = FunVar LAlphaA
+    | otherwise = TypeVar x 
 
 extractArgs :: HsType GhcPs -> [HsType GhcPs]
 extractArgs (HsFunTy _ _ arg1 arg2) = unXRec @(GhcPass 'Parsed) arg1 : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
@@ -260,7 +282,29 @@ HsBind to ValueD (intermediateHsBind)
 translates HsBind objects into intermediate ValueD objects
 -}
 intermediateHsBind :: HsBind GhcPs -> AST 
-intermediateHsBind decl = case decl of 
+intermediateHsBind decl = ValueD (intermediateHsBindToBinds decl)
+-- intermediateHsBind decl = case decl of 
+--     FunBind _ name matches _ -> 
+--         let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
+--             matchPs = map (\(L _ (Match _ _ pats body)) -> 
+--                 let boundVar = map intermediatePatts pats       
+--                     bodyExpr = intermediateGRHSs body       
+--                 in MP {bound_var = boundVar, guard_body = bodyExpr} ) (unLoc $ mg_alts matches)
+            
+--             matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
+
+--             boundVar = filterValidPatt $ boundVarToPatt$ transposeBoundVar matchLPats
+
+--         in ValueD (FBind {fun_name = funName, patt_args = boundVar, matches = matchPs})
+--     _ -> EmptyD
+
+
+{-
+
+-}
+
+intermediateHsBindToBinds :: HsBind GhcPs -> Binds 
+intermediateHsBindToBinds decl = case decl of 
     FunBind _ name matches _ -> 
         let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
             matchPs = map (\(L _ (Match _ _ pats body)) -> 
@@ -272,8 +316,8 @@ intermediateHsBind decl = case decl of
 
             boundVar = filterValidPatt $ boundVarToPatt$ transposeBoundVar matchLPats
 
-        in ValueD (FBind {fun_name = funName, patt_args = boundVar, matches = matchPs})
-    _ -> EmptyD
+        in FBind {fun_name = funName, patt_args = boundVar, matches = matchPs}
+    _ -> EmptyB
 
 
 {-
@@ -329,9 +373,136 @@ intermediateGRHSs (GRHSs _ grhss binds) =
 
 intermediateGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> GuardRHS 
 intermediateGRHS (L _ (GRHS _ guardStmt body)) = 
-    let guardStmts = if null guardStmt then [] else []      -- implement Stmts 
+    let guardStmts = if null guardStmt then [] else intermediateGuardStmts guardStmt      -- implement Stmts 
         exprStr = intermediateLExpr body 
     in StmtBody {guard_stmt = guardStmts, guard_expr =  exprStr}
+
+
+intermediateGuardStmts :: [GuardLStmt GhcPs] -> [Stmts]
+intermediateGuardStmts stms = map intermediateGuardStmt stms 
+
+
+intermediateGuardStmt :: GuardLStmt GhcPs -> Stmts 
+intermediateGuardStmt (L _ stmt) = case stmt of 
+    BodyStmt _ expr _ _ -> BodyStmts (intermediateLExpr expr)
+    LetStmt _ binds -> EmptyS 
+    BindStmt _ pat expr -> EmptyS 
+    _ -> EmptyS
+
+
+intermediateLocBinds :: HsLocalBinds GhcPs -> LocBinds 
+intermediateLocBinds binds = case binds of 
+    EmptyLocalBinds _ -> EmptyLocBinds 
+    HsValBinds _ (ValBinds _ bindlst sigs) -> intermediateValBinds bindlst sigs
+    _ -> EmptyLocBinds 
+
+intermediateValBinds :: LHsBindsLR GhcPs GhcPs -> [LSig GhcPs] -> LocBinds 
+intermediateValBinds binds sigs = 
+    let bindList = bagToList binds 
+        prettyBinds = map intermediateLHsBindLR bindList 
+        prettySigs = map (intermediateSigToSigs . unLoc) sigs 
+    in ValsBinds prettyBinds prettySigs
+
+{-
+let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
+            matchPs = map (\(L _ (Match _ _ pats body)) -> 
+                let boundVar = map intermediatePatts pats       
+                    bodyExpr = intermediateGRHSs body       
+                in MP {bound_var = boundVar, guard_body = bodyExpr} ) (unLoc $ mg_alts matches)
+            
+            matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
+
+            boundVar = filterValidPatt $ boundVarToPatt$ transposeBoundVar matchLPats
+-}
+intermediateLHsBindLR :: LHsBindLR GhcPs GhcPs -> Binds
+intermediateLHsBindLR (L _ bind) = case bind of 
+    FunBind _ id matches _ -> intermediateHsBindToBinds bind
+    _ -> EmptyB
+    --     let name = (occNameString . occName . unXRec @(GhcPass 'Parsed)) id 
+    --         m = map(\(L _ (Match _ c pats body)) ->
+    --             let bodyExpr = intermediateGRHSs body 
+    --             in MP {bound_var = [], guard_body = bodyExpr}) (unLoc $ mg_alts matches)
+    --     in FBinding name m 
+    -- _ -> EmptyBinding 
+        
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
+{-
+TyClassDecls Functions (TypeSyn and DataDecl)
+-}
+
+-- SynDecls {syn_name = "Name", qualTy_var = [], syn_body = TypeVar "String"}
+
+intermediateTyClDecl :: TyClDecl GhcPs -> AST 
+intermediateTyClDecl decl = case decl of 
+    SynDecl _ name tyVar fix rhs ->
+        let synName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
+            tyVarS = intermediateQTyVars tyVar      -- TODO: implement QualTyVar
+            rhsString = intermediateTypes (unLoc rhs)
+        in TyClassD (SynDecls {syn_name = synName, qualTy_var = tyVarS, syn_body = rhsString})
+    DataDecl _ name tyVar fix dataDef ->
+        let dataName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
+            tyVarStr = intermediateQTyVars tyVar 
+            dataDeriv = getDataDerivClause dataDef
+            dataDefnCons = getDataCons dataDef
+            typeData = getDataDefnNewOrData dataDef 
+        in TyClassD (DataDecls {defn_type = typeData, data_name = dataName, qualTy_var = tyVarStr, dataDefn_cons = dataDefnCons, deriv_clause = dataDeriv})
+    _ -> EmptyD
+
+
+--
+
+intermediateQTyVars :: LHsQTyVars GhcPs -> QTyVar
+intermediateQTyVars (HsQTvs _ tyVars) = map intermediateQTyVar tyVars 
+
+
+intermediateQTyVar :: LHsTyVarBndr () GhcPs -> String 
+intermediateQTyVar (L _ (UserTyVar _ _ (L _ name))) =  occNameString (occName name)
+
+--
+--
+
+getDataDefnNewOrData :: HsDataDefn GhcPs -> NoD 
+getDataDefnNewOrData (HsDataDefn _ nod _ _ _ _ _) = case nod of 
+    NewType -> NewTy 
+    DataType -> DataTy
+
+getDataDerivClause :: HsDataDefn GhcPs -> [Types] 
+getDataDerivClause (HsDataDefn _ nod contxt _ kind cons derv) =
+    if not (null derv) then [] else [] 
+
+--
+--
+
+getDataCons :: HsDataDefn GhcPs -> [DefnConsDetails]
+getDataCons (HsDataDefn _ nod contxt _ kind cons derv) = map getConDecl cons 
+
+
+getConDecl :: LConDecl GhcPs -> DefnConsDetails 
+getConDecl (L _ conDecl) = case conDecl of 
+    ConDeclH98 _ name _ _ _ detail _ -> 
+        let n = (occNameString (occName ( unLoc name)))
+            consDets = getConDetails (getConDeclH98Details detail)
+        in DefnConsDetail n consDets
+
+getConDetails :: HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs]) -> ConsDetails 
+getConDetails details = case details of 
+    PrefixCon tyArgs arg -> map intermediateTypes (map unLoc (getLHsTypes arg))
+    _ -> []
+
+
+getLHsTypes :: [HsScaled GhcPs (LHsType GhcPs)] -> [LHsType GhcPs]
+getLHsTypes = map getLHsType 
+
+getLHsType :: HsScaled GhcPs (LHsType GhcPs) -> LHsType GhcPs 
+getLHsType (HsScaled _ ty) = ty
+
+getConDeclH98Details :: HsConDeclH98Details GhcPs -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+getConDeclH98Details details = case details of 
+    PrefixCon _ args -> PrefixCon [] args 
+    InfixCon arg1 arg2 -> InfixCon arg1 arg2 
+    RecCon (L _ fields) -> RecCon (L noSrcSpan fields)
 
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
@@ -345,16 +516,34 @@ intermediateLExpr expr = intermediateExpr (unXRec @(GhcPass 'Parsed) expr)
 
 intermediateExpr :: HsExpr GhcPs -> Exprs 
 intermediateExpr = \case 
-    HsVar _ name -> Var (occNameString . occName . unLoc $ name)
+    HsVar _ name -> -- Var (occNameString . occName . unLoc $ name)
+        let n = (occNameString . occName . unLoc $ name)
+        in intermediateDecideExpr n
     HsApp _ expr1 expr2 -> App (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc expr2))
     OpApp _ expr1 op expr2 -> OperApp (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc op)) (intermediateExpr (unLoc expr2))
+    HsLet _ _ binds _ exp -> 
+        let b = intermediateLocBinds binds 
+            e = intermediateExpr (unLoc exp)
+        in LetExpr b e
     ExplicitList _ exprs -> ExpList (map intermediateLExpr exprs)
     HsOverLit _ lit -> Litr (intermediateOverLits lit)
     HsLit _ lit -> Litr (intermediateLits lit)
     _ -> Other
 
 
----------------------------------------------------------------
+intermediateDecideExpr :: String -> Exprs 
+intermediateDecideExpr x
+    | x == "putStrLn" = SpecialVar VPutStrLn
+    | x == "putStr" = SpecialVar VPutStr
+    | x == "Just" = SpecialVar VJust 
+    | x == "Nothing" = SpecialVar VNothing
+    | x == "Left" = SpecialVar VLeft
+    | x == "Right" = SpecialVar VRight
+    | otherwise = Var x
+
+
+
+---------------------------------------------------------------------
 ---------------------------------------------------------------------
 
 {-
