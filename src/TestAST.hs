@@ -415,8 +415,9 @@ tyClToLean = \case
         DataTy -> 
             let consList = map getConsDetails defnCons -- list of details of each constructor
                 consNames = map getConsNames defnCons
-                recursEnd = " : " ++ name ++ " " ++ (if not (null tyVar) then unwords tyVar ++ " " else "")
-                consLines = map (\s ->  s ++ recursEnd ) (map (getDefnCons tyVar) defnCons)
+                -- recursEnd = " : " ++ name ++ " " ++ (if not (null tyVar) then unwords tyVar ++ " " else "")
+                -- consLines = map (\s ->  s ++ recursEnd ) (map (getDefnCons tyVar) defnCons)
+                consLines = map (getDefnCons tyVar) defnCons
             in "inductive " ++ name ++ (if not (null tyVar) then " " ++ unwords (formatParameterizedQTyVar tyVar) else "") ++ " where\n" ++ intercalate "\n" (map ("| "++) consLines)
             -- UNFINISHED
     _ -> "TyClassDecls Not Implemented"
@@ -500,7 +501,7 @@ processType = \case
         LMaybe -> "Option"
         -- LJust -> "some"
         -- LNothing -> "none"
-        LAlphaA -> "α"
+        LAlphaA -> "a"--"α"
         _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
     AppTy ty1 ty2 -> processType ty1 ++ " " ++ processType ty2
@@ -773,6 +774,7 @@ main = do
                                 TyClassD (DataDecls {defn_type = DataTy, data_name = "Something", qualTy_var = ["a","b"], dataDefn_cons = [DefnConsDetail "Blah" [FunVar LAlphaA],DefnConsDetail "Bleh" [TypeVar "b"]], deriv_clause = []}),
                                 TyClassD (DataDecls {defn_type = DataTy, data_name = "Color", qualTy_var = [], dataDefn_cons = [DefnConsDetail "Red" [],DefnConsDetail "Green" [],DefnConsDetail "Blue" []], deriv_clause = []}),
                                 TyClassD (DataDecls {defn_type = DataTy, data_name = "Tree", qualTy_var = ["a"], dataDefn_cons = [DefnConsDetail "Empty" [],DefnConsDetail "Node" [FunVar LAlphaA,ParaTy (AppTy (TypeVar "Tree") (FunVar LAlphaA)),ParaTy (AppTy (TypeVar "Tree") (FunVar LAlphaA))]], deriv_clause = []}),
+                                TyClassD (DataDecls {defn_type = DataTy, data_name = "Tree2", qualTy_var = [], dataDefn_cons = [DefnConsDetail "Nil" [],DefnConsDetail "Nod" [TypeVar "Int",TypeVar "Tree2",TypeVar "Tree2"]], deriv_clause = []}),
                                 SignatureD (TySig {ty_name = "add", qual_ty = [], fun_type = [TypeVar "Int",TypeVar "Int",TypeVar "Int"], fun_bind = EmptyB}),
                                 ValueD (FBind {fun_name = "add", patt_args = ["a","b"], matches = [MP {bound_var = [VariPatt "a",VariPatt "b"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Var "a") (Var "+") (Var "b")}], loc_binds = EmptyLocBinds}}]}),
                                 ValueD (FBind {fun_name = "minus", patt_args = ["a","b"], matches = [MP {bound_var = [VariPatt "a",VariPatt "b"], guard_body = Guards {guard_exprs = [StmtBody {guard_stmt = [], guard_expr = OperApp (Var "a") (Var "-") (Var "b")}], loc_binds = EmptyLocBinds}}]}),

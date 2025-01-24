@@ -19,6 +19,7 @@ data Color = Red | Green | Blue         -- data : no QualTy
 
 data Tree a = Empty | Node a (Tree a) (Tree a)      -- data : QualTy and multiple constructor types
 
+data Tree2 = Nil | Nod Int Tree2 Tree2
 
 ----------------------------
 -- functions

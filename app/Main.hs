@@ -83,7 +83,7 @@ main = do
 
 
       -- make the simple AST
-      liftIO $ generateSimpleAST astForLean
+      -- liftIO $ generateSimpleAST astForLean
       
       liftIO $ generateIntermediateAST astForLean
 
