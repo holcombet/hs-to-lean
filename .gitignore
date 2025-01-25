@@ -5,3 +5,9 @@ output.txt
 *.o 
 *.hi
 .env
+
+
+# ignore all non-.hs files in examples
+examples/*
+!examples/*.hs
+!examples/**/
