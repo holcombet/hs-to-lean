@@ -33,29 +33,7 @@ runhaskell src/TestAST.hs
 
 ## Notable Limitations
 
-* Does not currently implement the need for dot-notation with data constructors (for custom types and non-primitive(?) types)
-    * e.g. in Haskell, we can make a list using `:`, which is especially useful for recursive functions with lists
-    
-        ```
-        modList :: [Int] -> [Int]
-        modlist [] = []
-        modList (x : xs) = x + 1 : modList xs
-        ```
-        This would not translate directly to Lean (the way it current is). We cannot say `x+1 :: modList xs`. 
-        
-        Instead, the function would look more like this:
-
-        ```
-        def modList (xs : List Int) : List Int := 
-            match xs with 
-            | [] => []
-            | x :: xs => List.cons (x + 1)  (modList xs )
-        ```
-
-        I think this will be a reasonably simple change, it just has not been implemented yet.
-
-
-* There are plenty other small limitations. Bigger limitations will be added to this list as they are discovered.
+* There are plenty small limitations. Bigger limitations will be added to this list as they are discovered.
 
 ## Current File Set-Up
 

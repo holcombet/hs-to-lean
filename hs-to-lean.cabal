@@ -26,6 +26,7 @@ library
                     , HsToLean.TranslateHaskell
                     , HsToLean.SimpleAST
                     , HsToLean.ProcessFile
+                    , HsToLean.ASTToLean
                     , StructureAst
                     , TestFunctions
                     , HaskellToHaskell

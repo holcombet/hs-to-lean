@@ -4,7 +4,7 @@
 Module for processing the ghc-lib-parser AST into the intermediate ADT structure.
 -}
 
-module HsToLean.ProcessFile (generateIntermediateAST) where 
+module HsToLean.ProcessFile (generateIntermediateAST, getIntermediateAST) where 
 
 import GHC
 import GHC.Maybe
@@ -37,6 +37,7 @@ import Data.Kind (FUN)
 import System.IO
 
 import TestAST
+import HsToLean.ASTToLean
 
 
 
@@ -158,6 +159,14 @@ generateIntermediateAST ast = do
         interDecls = map intermediateDecls ps 
         -- sortedDeclList = sortDeclList interDecls 
     liftIO $ writeFile "IntermediateAST.txt" ("[" ++ (intercalate ",\n" $ showIntermediateAST interDecls) ++ "]")
+
+
+getIntermediateAST :: ParsedSource -> [AST]
+getIntermediateAST ast = do 
+    let ps = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ ast 
+        interDecls = map intermediateDecls ps 
+    
+    interDecls
 
 showIntermediateAST :: [AST] -> [String]
 showIntermediateAST = map show 
@@ -521,16 +530,27 @@ intermediateExpr = \case
         in intermediateDecideExpr n
     HsApp _ expr1 expr2 -> App (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc expr2))
     OpApp _ expr1 op expr2 -> OperApp (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc op)) (intermediateExpr (unLoc expr2))
+        -- let oper = intermediateExpr (unLoc op)
+        --     cl = if oper == ":" then reorderConsList (OpApp _ expr1 op expr2) else []
+        -- in if cl == [] then OperApp (intermediateExpr (unLoc expr1)) oper (intermediateExpr (unLoc expr2)) else ListCons cl
+
+    HsPar _ _ e _ -> ParaExpr (intermediateExpr (unLoc e))
     HsLet _ _ binds _ exp -> 
         let b = intermediateLocBinds binds 
             e = intermediateExpr (unLoc exp)
         in LetExpr b e
+    HsIf _ exp1 exp2 exp3 -> IfExpr (intermediateExpr (unLoc exp1)) (intermediateExpr (unLoc exp2)) (intermediateExpr (unLoc exp3))
     ExplicitList _ exprs -> ExpList (map intermediateLExpr exprs)
     HsOverLit _ lit -> Litr (intermediateOverLits lit)
     HsLit _ lit -> Litr (intermediateLits lit)
     _ -> Other
 
 
+{-
+intermediateDecideExpr
+    function for identifying keywords/operations that have different name in Lean (or other ITPs)
+    to improve translation efforts
+-}
 intermediateDecideExpr :: String -> Exprs 
 intermediateDecideExpr x
     | x == "putStrLn" = SpecialVar VPutStrLn
@@ -541,6 +561,18 @@ intermediateDecideExpr x
     | x == "Right" = SpecialVar VRight
     | otherwise = Var x
 
+
+{-
+function for reordering lists built with the ":" operator
+-}
+
+reorderConsList :: HsExpr GhcPs -> [Exprs]
+reorderConsList x = case x of
+    OpApp _ expr1 op expr2 -> 
+        let o = intermediateExpr (unLoc op)
+            e2 = reorderConsList (unLoc expr2)
+        in intermediateExpr (unLoc expr1) : o : e2
+    _ -> [intermediateExpr x]
 
 
 ---------------------------------------------------------------------

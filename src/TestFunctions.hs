@@ -29,8 +29,8 @@ data Tree2 = Nil | Nod Int Tree2 Tree2
 add :: Int -> Int -> Int 
 add a b = a + b
 
--- implicit type signature
-minus a b = a - b
+-- implicit type signature --> unsure if possible
+-- minus a b = a - b
 
 
 -- return type only
@@ -74,11 +74,24 @@ calculateRandom x =
 
 -- test recursive guards
 nthElement :: [a] -> Int -> Maybe a 
-nthElement [] a = Nothing
-nthElement (x:xs) a | a <= 0 = Nothing
-                    | a == 1 = Just x
-                    | a > 1 = nthElement xs (a-1)
+nthElement [] b = Nothing
+nthElement (x:xs) b | b <= 0 = Nothing
+                    | b == 1 = Just x
+                    | otherwise = nthElement xs (b-1)
 
+
+insert :: Int -> [Int] -> [Int]
+insert x [] = [x]
+insert x (y:ys) = if x < y 
+                 then x:y:ys 
+         else y : insert x ys
+
+insertionSort :: [Int] -> [Int]
+insertionSort [] = []
+insertionSort (x:xs) = insert x (insertionSort xs)
+
+applyFunc :: (Int -> Int) -> Int -> Int
+applyFunc f x = f x
 --------------------------------------
 -- Currently un-used test functions
 --------------------------------------
@@ -133,8 +146,7 @@ nthElement (x:xs) a | a <= 0 = Nothing
 -- example Bar = "No data"
 
 
--- applyFunc :: (Int -> Int) -> Int -> Int
--- applyFunc f x = f x
+
 
 
 

@@ -33,7 +33,8 @@ import System.IO
 
 import HsToLean.TranslateHaskell (translateToLean)
 import HsToLean.SimpleAST (generateSimpleAST)
-import HsToLean.ProcessFile (generateIntermediateAST)
+import HsToLean.ProcessFile (getIntermediateAST, generateIntermediateAST)
+import HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs)
 
 -- import TestAST 
 
@@ -86,6 +87,9 @@ main = do
       -- liftIO $ generateSimpleAST astForLean
       
       liftIO $ generateIntermediateAST astForLean
+
+      let interAST = findASTPairs (getIntermediateAST astForLean)
+      liftIO $ writeFile "LeanResult.lean" (intercalate "\n\n" (astListToLean interAST))
 
 
       -- call HaskellToHaskell
