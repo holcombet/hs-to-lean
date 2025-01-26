@@ -93,6 +93,7 @@ data SVar
     | VJust
     | VLeft
     | VRight
+    | VPi
     | EmptyV 
     deriving (Eq, Show)
 data LocBinds 

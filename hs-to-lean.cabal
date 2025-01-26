@@ -69,6 +69,7 @@ executable hs-to-lean
         ghc-lib-parser,
         ghc-paths,
         filepath,
+        directory,
         syb
         
 

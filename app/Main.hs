@@ -9,9 +9,8 @@ import "ghc" GHC.Parser
 import "ghc" GHC.Utils.Outputable
 import Data.Generics (gshow)
 import GHC.Paths
-import System.Environment ( getArgs )
-import System.FilePath (takeBaseName)
-import System.IO (writeFile)
+
+-- import System.IO (writeFile)
 import "ghc" GHC.Driver.Session -- ( defaultFatalMessager, defaultFlushOut )
 import Control.Monad.IO.Class
 import "ghc" GHC.Driver.Phases (Phase(Cpp))
@@ -28,13 +27,18 @@ import Data.Bool (Bool)
 import "ghc" GHC.Data.Bag (bagToList, Bag)
 import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
+
 import System.IO
-import System.Environment (getArgs)
+import System.Environment ( getArgs, getExecutablePath )
+import System.FilePath (takeBaseName, takeDirectory)
+-- import System.Environment (getArgs)
+import System.Directory (doesFileExist)
+
 
 
 import HsToLean.TranslateHaskell (translateToLean)
 import HsToLean.SimpleAST (generateSimpleAST)
-import HsToLean.ProcessFile (getIntermediateAST, generateIntermediateAST)
+import HsToLean.ProcessFile (getIntermediateAST, generateIntermediateAST, showIntermediateAST)
 import HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs)
 
 -- import TestAST 
@@ -59,17 +63,58 @@ prettyPrint = unlines . snd . foldl processChar (0, []) where
 main :: IO ()
 main = do
   -- TODO: get target file from command line
-  -- args <- getArgs
+  args <- getArgs
+  
+  -- let userTargetFile = ""
+
+  let defaultTargetFile = "examples/TestFunctions.hs"
+
+  let userTargetFile = if not (null args) && (length args) == 1 then head args else defaultTargetFile 
+  -- if userTargetFile /= defaultTargetFile then 
+  fileExists <- doesFileExist userTargetFile 
+
+  if fileExists 
+    then liftIO $ putStrLn "Translating file..."
+    else liftIO $ putStrLn "Invalid file or file path. Translating default file: examples/TestFunctions.hs"
+      
+  -- fileExists <- doesFileExist (head args)
+
+  -- let userTargetFile = if not (null args) then 
+  --                       if length args == 1 && fileExists then head args 
+  --                         else defaultTargetFile
+  -- liftIO $ putStrLn $ if userTargetFile == defaultTargetFile then "invalid arguments. Translating default example.\n"
+  --         else ""
+  
+
+  {-
+  args <- getArgs
+    case args of
+        [filePath] -> do
+            -- Get the path to the executable
+            execPath <- getExecutablePath
+            -- Extract the directory of the executable
+            let execDir = takeDirectory execPath
+            -- Combine the executable directory with the relative file path
+            let fullPath = execDir </> filePath
+            -- Check if the file exists at the combined path
+            fileExists <- doesFileExist fullPath
+            if fileExists
+                then putStrLn $ "The file exists: " ++ fullPath
+                else putStrLn $ "The file does not exist: " ++ fullPath
+        _ -> putStrLn "Please provide a file path as a single argument."
+  -}
   
 
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags
-      target <- guessTarget "examples/TestFunctions.hs" Nothing (Just (Cpp HsSrcFile))
+      target <- guessTarget (if fileExists then userTargetFile else defaultTargetFile) Nothing (Just (Cpp HsSrcFile))
+      -- target <- guessTarget "examples/TestFunctions.hs" Nothing (Just (Cpp HsSrcFile))
       setTargets [target]
       load LoadAllTargets
-      let moduleName = takeBaseName "examples/TestFunctions.hs"
+      -- let moduleName = takeBaseName "examples/TestFunctions.hs"
+      let moduleName = takeBaseName (if fileExists then userTargetFile else defaultTargetFile)
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
 
@@ -90,6 +135,8 @@ main = do
       liftIO $ generateIntermediateAST astForLean
 
       let interAST = findASTPairs (getIntermediateAST astForLean)
+      liftIO $ putStrLn $ unlines $ showIntermediateAST interAST
+      liftIO $ putStrLn "\n\n"
       liftIO $ writeFile "LeanResult.lean" (intercalate "\n\n" (astListToLean interAST))
 
 

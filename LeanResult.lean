@@ -1,91 +1,42 @@
-def frac  : Float := 
-1 / 2
+inductive Shape where
+| Circle (a : Float)
+| Rectangle (a : Float) (b : Float)
+
+open Shape
 
 
 
-abbrev Name  := String
+def area (a : Shape) : Float := 
+match a with
+| (Circle r) => 3.14159 * r ^ 2
+| (Rectangle l w) => l * w
 
-abbrev ResultFunction a b := a -> Except String b
 
-inductive Something (a : Type) (b : Type) where
-| Blah (c : a)
-| Bleh (c : b)
-
-inductive Color where
-| Red 
-| Green 
-| Blue 
-
-inductive Tree (a : Type) where
-| Empty 
-| Node (b : a) (c : (Tree a)) (d : (Tree a))
-
-inductive Tree2 where
+inductive Tree where
 | Nil 
-| Nod (a : Int) (b : Tree2) (c : Tree2)
+| Node (a : Int) (b : Tree) (c : Tree)
 
-def add (a : Int) (b : Int) : Int := 
-a + b
-
-
-
-def abc  : Int := 
-13
+open Tree
 
 
 
-def random (x : Int) (ys : List Int) : Int := 
-match x, ys with
-| x, [] => x
-| x, (y :: ys) => x - 1
+def insert (x : Int) (a : Tree) : Tree := 
+match x, a with
+| x, Nil  => Node x Nil Nil
+| x, (Node a left right) => if x < a then Node a (insert x left) right else Node a left (insert x right)
 
 
-def categorizeNumber (x : Int) : String := 
-if x < 0 then "Negative" else
-if x == 0 then "Zero" else
-if x < 10 then "Small" else
-"Large"
-
-
-
-def calculateArea (r : Float) : Float := 
-let pi := 3.14
-(pi * r * r)
-
-
-
-def calculateRandom (x : Int) : Int := 
-let y := 10
-let z := 2
-(x + y + z)
-
-
-
-def nthElement (xs : List a) (b : Int) : Option a := 
-match xs, b with
-| [], b => none
-| (x :: xs), b => 
-if b <= 0 then none else
-
-if b == 1 then some x else
-nthElement xs (b - 1)
-
-def insert (x : Int) (ys : List Int) : List Int := 
-match x, ys with
-| x, [] => [x]
-| x, (y :: ys) => if x < y then x :: y :: ys else y :: insert x ys
-
-
-def insertionSort (xs : List Int) : List Int := 
+def heapify (xs : List Int) : Tree := 
 match xs with
-| [] => []
-| (x :: xs) => insert x (insertionSort xs)
+| []  => Nil
+| (x :: xs) => insert x (heapify xs)
 
 
-def applyFunc (f : (Int -> Int)) (x : Int) : Int := 
-f x
+def tree2list (a : Tree) : List Int := 
+match a with
+| Nil  => []
+| (Node a left right) => tree2list left ++ [a] ++ tree2list right
 
 
-
-def main  := IO.print "Hello World"
+def heapSort  := tree2list ∘ heapify
 

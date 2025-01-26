@@ -4,7 +4,7 @@
 Module for processing the ghc-lib-parser AST into the intermediate ADT structure.
 -}
 
-module HsToLean.ProcessFile (generateIntermediateAST, getIntermediateAST) where 
+module HsToLean.ProcessFile (generateIntermediateAST, getIntermediateAST, showIntermediateAST) where 
 
 import GHC
 import GHC.Maybe
@@ -118,7 +118,12 @@ isConPattInfix = \case
     _ -> False
 
 
-
+isConPattPrefix :: Patts -> Bool
+isConPattPrefix = \case
+    ConPatt _ details -> case details of 
+        ConPattPrefix x -> True 
+        _ -> False 
+    _ -> False
 
 isEmptyLocBinds :: LocBinds -> Bool 
 isEmptyLocBinds = \case 
@@ -134,10 +139,15 @@ getConPattTail = \case
     ParPatt p -> getConPattTail p
     _ -> ""
 
-    
+getConType :: Patts -> String 
+getConType = \case 
+    ConPatt t d -> t 
+    _ -> ""
+
 getVarPattFromPatts :: Patts -> VarPatt
 getVarPattFromPatts = \case 
     VariPatt x -> x 
+    -- ConPatt t d -> if t == "[]" else
     _ -> ""
 
 
@@ -324,8 +334,10 @@ intermediateHsBindToBinds decl = case decl of
             matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
 
             boundVar = filterValidPatt $ boundVarToPatt$ transposeBoundVar matchLPats
+            numPlaceholderVar = countNumTempVar boundVar 
 
-        in FBind {fun_name = funName, patt_args = boundVar, matches = matchPs}
+        -- in FBind {fun_name = funName, patt_args = boundVar, matches = matchPs}
+        in FBind {fun_name = funName, patt_args = if numPlaceholderVar == 0 then boundVar else replaceTempVar numPlaceholderVar boundVar, matches = matchPs}
     _ -> EmptyB
 
 
@@ -352,6 +364,7 @@ chooseVar [] = ""
 chooseVar (x : xs) 
     | isVarPatt x = getVarPattFromPatts x
     | isConPattInfix x = getConPattTail x 
+    | isConPattPrefix x = "temporaryVar"
     | otherwise = chooseVar xs 
 
 
@@ -359,12 +372,35 @@ findValidPattNames :: [Patts] -> [Patts]
 findValidPattNames [] = []
 findValidPattNames (x : xs) = 
     let name = if isVarPatt x then x else 
-                    if isConPattInfix x then x
-                    else EmptyP
+                    if isConPattInfix x then x  else 
+                        if isConPattPrefix x && not (getConType x == "[]" ) then x
+                            else EmptyP
     in name : findValidPattNames xs
     
+{-
+replaceTempVar, replaceVar
+    replace temp var with created var
+-}
      
+replaceTempVar :: Int -> [VarPatt] -> [VarPatt]
+replaceTempVar i v = 
+    let newVar = generateVarNamesExcluding i v 
+    in replaceVar v newVar 
 
+replaceVar :: [VarPatt] -> [String] -> [VarPatt]
+replaceVar [] _ = [] 
+replaceVar (x : xs) (y : ys) 
+    | x == "temporaryVar" = y : replaceVar xs ys 
+    | otherwise = x : replaceVar xs (y : ys )
+replaceVar (x : xs) [] = x : xs
+
+{-
+countNumTempVar
+-}
+countNumTempVar :: [VarPatt] -> Int 
+countNumTempVar [] = 0 
+countNumTempVar (x : xs) = if x == "temporaryVar" then 1 + countNumTempVar xs 
+                            else countNumTempVar xs
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
 
@@ -559,6 +595,7 @@ intermediateDecideExpr x
     | x == "Nothing" = SpecialVar VNothing
     | x == "Left" = SpecialVar VLeft
     | x == "Right" = SpecialVar VRight
+    | x == "pi" = SpecialVar VPi
     | otherwise = Var x
 
 
@@ -636,3 +673,18 @@ intermediateOverLits (OverLit _ val) = case val of
 
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
+
+
+{-
+generateVarNamesExcluding
+    Helper function
+-}
+generateVarNamesExcluding :: Int -> [String] -> [String]
+generateVarNamesExcluding n exclude = take n $ filter (`notElem` exclude) $ map toName [0..]
+  where
+    -- Convert a number to a variable name
+    toName :: Int -> String
+    toName x
+      | x < 26    = [alphabet !! x]
+      | otherwise = toName (x `div` 26 - 1) ++ [alphabet !! (x `mod` 26)]
+    alphabet = ['a'..'z']

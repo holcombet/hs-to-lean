@@ -26,13 +26,18 @@ sigToLean :: Sigs -> String
 sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
-            funTyList = processFunType funTy
-            retTy = last funTyList
+            funTyList = processFunType funTy        -- parameter types
+
+            -- customs = findCustomFunTy funTy 
+            -- open = if null customs then "" else 
+            --     unlines (map ("open "++) customs )
+
+            retTy = last funTyList      -- return type
             -- isValBind = head(processFunType funTy) == last(processFunType funTy)
             isValBind = length funTyList == 1
         -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
         -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean (getFirstTy (head funTy)) funBind else bindsToLean funBind)
-        in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean tyName funBind else bindsToLean funBind)
+        in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean tyName funBind else bindsToLean funBind) 
     -- _ -> "Not Implemented"
 
 
@@ -230,6 +235,7 @@ tyClToLean = \case
                 -- consLines = map (\s ->  s ++ recursEnd ) (map (getDefnCons tyVar) defnCons)
                 consLines = map (getDefnCons tyVar) defnCons
             in "inductive " ++ name ++ (if not (null tyVar) then " " ++ unwords (formatParameterizedQTyVar tyVar) else "") ++ " where\n" ++ intercalate "\n" (map ("| "++) consLines)
+                ++ "\n\n" ++ "open " ++ name ++ "\n\n"
             -- UNFINISHED
     _ -> "TyClassDecls Not Implemented"
 
@@ -282,8 +288,9 @@ getBoundVar funTy funBind = thing
         listTys = init (processFunType funTy)
         listBinds = case funBind of
             FBind name args match ->  args 
+            -- FBind name args match -> if args == [""] then generateVarNames (length listTys) else args 
             _ -> []
-    
+
         -- returnTy = last listTys
         -- argty = init listTys
         pairedLists = zip listBinds listTys 
@@ -294,6 +301,8 @@ getBoundVar funTy funBind = thing
                                 --   processPatt, processPattArgs)
 unzipBindTyList :: [(String, String)] -> [String]
 unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
+
+
 
 
 ---------------------------------------------------------------
@@ -351,7 +360,7 @@ processPatt = \case
         let patDetails = getConPattDetails det 
             con_ty = if ty == ":" then " :: " else ty
         in case det of 
-            ConPattPrefix _ -> con_ty               -- TODO: something might be missing here...
+            ConPattPrefix p -> ty ++ " " ++ if null p then "" else  unwords (map processPatt p)--con_ty               -- TODO: something might be missing here...
             ConPattInfix _ _ ->  intercalate con_ty patDetails
                 -- if con_ty == " :: " then unwords (map ("List.con " ++ ) patDetails) else intercalate con_ty patDetails
     LitPatt l -> processLits l 
@@ -383,11 +392,14 @@ processExprs = \case
         VPutStr -> "IO.print"
         VJust -> "some"
         VNothing -> "none"
+        VPi -> "3.14159"
         _ -> "Special Expr Not Implemented"
     App e1 e2 -> processExprs e1 ++ " " ++ processExprs e2 
     OperApp e1 o e2 -> -- processExprs e1 ++ " " ++ processExprs o ++ " " ++ processExprs e2 
         let oper = processExprs o 
-        in if oper == ":" then processExprs e1 ++ " " ++ "::" ++ " " ++ processExprs e2 else processExprs e1 ++ " " ++  oper ++ " " ++ processExprs e2 
+        in if oper == ":" then processExprs e1 ++ " " ++ "::" ++ " " ++ processExprs e2 else 
+            if oper == "." then processExprs e1 ++  " ∘ " ++ processExprs e2 else 
+                processExprs e1 ++ " " ++  oper ++ " " ++ processExprs e2 
     ParaExpr e -> "(" ++ processExprs e ++ ")"
     LetExpr bind exp -> 
         -- let bndrs = unzipLocBindsToBinds (processLocBindsToLean bind)
@@ -488,6 +500,21 @@ Functions fo iterating over list of AST decls
 Goes through list of AST objects and links FBinds associated with their TySig
 (because FBind can be independent or a constructor of TySig)
 -}
+-- findASTPairs :: [AST] -> [AST]
+-- findASTPairs [] = []
+-- findASTPairs [x] = [x]
+-- findASTPairs (x : xs : ys) = 
+--     if isTySig x && isFBind xs then 
+--         let ty = toSig x 
+--             f = toBinds xs
+--             result =
+--                 if getSigName ty == getBindName f then 
+--                     let combined = ty {fun_bind = f}
+--                     in SignatureD combined : findASTPairs ys
+--                 else (x : findASTPairs (xs :ys))
+--         in result
+--     else (x : findASTPairs (xs : ys) )
+
 findASTPairs :: [AST] -> [AST]
 findASTPairs [] = []
 findASTPairs [x] = [x]
@@ -497,12 +524,17 @@ findASTPairs (x : xs : ys) =
             f = toBinds xs
             result =
                 if getSigName ty == getBindName f then 
-                    let combined = ty {fun_bind = f}
-                    in SignatureD combined : findASTPairs ys
+                    if getNumSigParam ty >= 1 && (getBindArgs f == [""]) then 
+                        let newArgs = generateVarNames (getNumSigParam ty)
+                            newFunB = f {patt_args = newArgs}
+                            combined = ty {fun_bind = newFunB}
+                        in SignatureD combined : findASTPairs ys 
+                    else
+                        let combined = ty {fun_bind = f}
+                        in SignatureD combined : findASTPairs ys
                 else (x : findASTPairs (xs :ys))
         in result
     else (x : findASTPairs (xs : ys) )
-
 
 {-
 isTySig
@@ -531,7 +563,13 @@ getSigName
 getSigName :: Sigs -> String
 getSigName = \case 
     TySig name _ _ _ -> name 
+    EmptySig -> ""
     
+getNumSigParam :: Sigs -> Int 
+getNumSigParam = \case 
+    TySig _ _ f _ -> (length f) - 1
+    EmptySig -> -1
+
 {-
 isFBind
 - Checks if AST object is type FBind
@@ -559,6 +597,10 @@ getBindName :: Binds -> String
 getBindName = \case 
     FBind name _ _ -> name
 
+getBindArgs :: Binds -> [VarPatt]
+getBindArgs = \case 
+    FBind name args match -> args 
+    _ -> []
 
 {-
 removeTrailingWhitespace 
@@ -570,8 +612,28 @@ removeTrailingWhitespace = reverse . dropWhile (== ' ') . reverse
 -- removeTrailingWhitespace x = intercalate "" (words x)
 
 
+findCustomFunTypes :: [AST] -> [String]
+findCustomFunTypes [] = []
+findCustomFunTypes (x : xs) = case x of 
+    SignatureD s -> case s of 
+        TySig _ _ ft _ -> 
+            let c = findCustomFunTy ft 
+            in c ++ findCustomFunTypes xs 
+        _ -> [] 
+    _ -> []
+
+
+findCustomFunTy :: FunType -> [String]
+findCustomFunTy [] = []
+findCustomFunTy (x : xs) = case x of 
+    TypeVar s -> 
+        if s `notElem` builtInTypes then s : findCustomFunTy xs else findCustomFunTy xs 
+    _ -> []
+
 {-
 listLengthIsOdd
     function that determines if list length is odd
 -}
 
+builtInTypes :: [String]
+builtInTypes = ["Integer", "Int", "Float", "Bool", "Maybe", "Either", "a"]
