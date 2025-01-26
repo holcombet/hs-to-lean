@@ -4,6 +4,8 @@ This is a project by Tally Holcombe for her Masters in Electrical Engineering an
 
 The goal of this project is to verify Haskell code by translating it into Lean (Theorem Prover) code. 
 
+**Currently Under Construction** This repo is still under construction. Unnecessary or pedantic information will be removed once this project is finalized.
+
 ## Description
 
 The overarching goal of this project is to successfully validate Haskell s ource code by translating it into the [Lean Theorem Prover](https://lean-lang.org/). 
@@ -23,10 +25,25 @@ This project requires the following packages:
 In the parent directory (hs-to-lean), run the program 
 ```
 cabal build
-cabal run > "output.txt"
+cabal run hs-to-lean > "output.txt"
+```
+
+or
+
+```
+cabal build
+cabal run hs-to-lean <filepath> > "output.txt"
 ```
 
 The Lean translation is written to a file called `LeanResult.lean` in the parent folder (hs-to-lean). 
+
+`> "output.txt"` writes any output to an output file (will delete later).
+
+Running without a filepath will translate the default Haskell program (examples/TestFunctions.hs). 
+
+To translate other Haskell files, put the target haskell file into the examples director. (Note: make sure it has the module header: `module ModuleName where`).
+
+All translated files should be in the `examples` directory. All filepaths entered during compilation should be of the format `examples/...`
 
 ## Notable Limitations
 
