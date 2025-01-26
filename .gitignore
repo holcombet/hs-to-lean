@@ -2,10 +2,15 @@ dist-newstyle
 .aider*
 .DS_Store
 output.txt
-LeanResult.lean
 *.o 
 *.hi
 .env
+
+# output files
+LeanResult.lean
+AST.txt
+hs_structured_AST.txt 
+intermediateAST.txt 
 
 
 # ignore all non-.hs files in examples
