@@ -2,6 +2,7 @@ dist-newstyle
 .aider*
 .DS_Store
 output.txt
+LeanResult.lean
 *.o 
 *.hi
 .env
@@ -11,3 +12,4 @@ output.txt
 examples/*
 !examples/*.hs
 !examples/**/
+
