@@ -29,6 +29,7 @@ import "ghc" GHC.Data.Bag (bagToList, Bag)
 import "ghc" GHC.Hs.Binds
 import Data.Ratio ((%))
 import System.IO
+import System.Environment (getArgs)
 
 
 import HsToLean.TranslateHaskell (translateToLean)
@@ -58,17 +59,17 @@ prettyPrint = unlines . snd . foldl processChar (0, []) where
 main :: IO ()
 main = do
   -- TODO: get target file from command line
+  -- args <- getArgs
   
-
 
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags
-      target <- guessTarget "src/TestFunctions.hs" Nothing (Just (Cpp HsSrcFile))
+      target <- guessTarget "examples/TestFunctions.hs" Nothing (Just (Cpp HsSrcFile))
       setTargets [target]
       load LoadAllTargets
-      let moduleName = takeBaseName "src/TestFunctions.hs"
+      let moduleName = takeBaseName "examples/TestFunctions.hs"
       modSum <- getModSummary $ mkModuleName moduleName
       parsedModule <- GHC.parseModule modSum
 

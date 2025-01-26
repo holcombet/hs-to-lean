@@ -26,10 +26,7 @@ cabal build
 cabal run > "output.txt"
 ```
 
-To see the translation from the custom AST (generated during cabal build/run), run the haskell program (in the parent director, hs-to-lean):
-```
-runhaskell src/TestAST.hs
-```
+The Lean translation is written to a file called `LeanResult.lean` in the parent folder (hs-to-lean). 
 
 ## Notable Limitations
 
