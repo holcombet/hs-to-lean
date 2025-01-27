@@ -27,16 +27,8 @@ sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
             funTyList = processFunType funTy        -- parameter types
-
-            -- customs = findCustomFunTy funTy 
-            -- open = if null customs then "" else 
-            --     unlines (map ("open "++) customs )
-
             retTy = last funTyList      -- return type
-            -- isValBind = head(processFunType funTy) == last(processFunType funTy)
             isValBind = length funTyList == 1
-        -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
-        -- in "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean (getFirstTy (head funTy)) funBind else bindsToLean funBind)
         in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind then valBindsToLean tyName funBind else bindsToLean funBind) 
     -- _ -> "Not Implemented"
 
@@ -67,8 +59,6 @@ implicitBindsToLean = \case
 bindsToLean :: Binds -> String
 bindsToLean = \case
     FBind name args match -> 
-        
-        -- if (null args || length match == 1)  then unlines ( map matchpairToLean match) -- intercalate ", "  match 
         if length match == 1  then unlines ( map singleMatchPairToLean match)
         else 
             let matchStmt = "match " ++ intercalate ", " ( args) ++ " "  ++ "with\n"
@@ -118,8 +108,6 @@ singleGuardRHSsToLean = \case
     Guards gs loc ->
             let guards = map singleGuardRHSToLean gs
                 bndr = if loc == EmptyLocBinds then "" else "local binds no implemented"
-                -- trimGuardsExpr = words (unlines guards)
-            -- in (if tail (unwords trimGuardsExpr) == "else" then init (unwords trimGuardsExpr) else unlines guards) ++ if bndr == "" then "" else "\n"
             in unlines guards ++ if bndr == "" then "" else "\n"
 
 singleGuardRHSToLean :: GuardRHS -> String 
@@ -130,9 +118,6 @@ singleGuardRHSToLean (StmtBody sm epr) =
         exprStr = if null sm then processExprs epr else 
             let ex = processExprs epr 
             in if guardStmts == "" then  ex else ex ++ " else"
-
-            -- if tail (words exprStr) == "else" then unwords (init )
-    -- in guardStmts ++ if unwords (tail trimExprStr) == " else" then unwords (init trimExprStr) else exprStr
     in guardStmts ++ exprStr
 
 
@@ -205,12 +190,8 @@ processLocBindsToLean bind = case bind of
     ValsBinds bndlst sig -> 
         let bindlst =  map bindingsToLean bndlst
             sigs = map sigToLean sig 
-            -- s = if null sigs then 
         in unlines bindlst ++ unlines sigs
-        -- let bindlst = map bindingsToLean bndlst
-        --     sigs = map sigToLean sig
-        -- -- in  (intercalate "" bindlst) ++ unlines sigs
-        -- in [unwords bindlst, unlines sigs]
+
     
 
 ---------------------------------------------------------------
@@ -416,14 +397,6 @@ processExprs = \case
     _ -> "Expr not implemented"
 
 
--- processListConstructor :: Exprs -> Exprs -> String 
--- processListConstructor e1 e2 =
-    -- let ex2 = processExprs e2 
--- processListConstructor e1 e2 = "(List.cons " ++ "(" ++ processExprs e1  ++ ") (" ++ processExprs e2 ++ ")) "
-
-
-
-
 {-
 Removes empty strings from list to prevent extra newlines
 -}
@@ -500,20 +473,6 @@ Functions fo iterating over list of AST decls
 Goes through list of AST objects and links FBinds associated with their TySig
 (because FBind can be independent or a constructor of TySig)
 -}
--- findASTPairs :: [AST] -> [AST]
--- findASTPairs [] = []
--- findASTPairs [x] = [x]
--- findASTPairs (x : xs : ys) = 
---     if isTySig x && isFBind xs then 
---         let ty = toSig x 
---             f = toBinds xs
---             result =
---                 if getSigName ty == getBindName f then 
---                     let combined = ty {fun_bind = f}
---                     in SignatureD combined : findASTPairs ys
---                 else (x : findASTPairs (xs :ys))
---         in result
---     else (x : findASTPairs (xs : ys) )
 
 findASTPairs :: [AST] -> [AST]
 findASTPairs [] = []

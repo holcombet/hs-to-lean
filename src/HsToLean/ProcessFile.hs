@@ -84,12 +84,9 @@ emptyMatchPair :: MatchPair
 emptyMatchPair = MP {bound_var = [], guard_body = EmptyG}
 
 
--- emptyAST :: ASt 
--- emptyAST = SignatureD (TyClassD {name = ""})
 
-{-
-constructor checkers
--}
+
+
 
 
 ---------------------------------------------------------------------
@@ -167,7 +164,6 @@ generateIntermediateAST :: ParsedSource -> IO()
 generateIntermediateAST ast = do 
     let ps = map (unXRec @(GhcPass 'Parsed)) $ hsmodDecls $ unLoc $ ast 
         interDecls = map intermediateDecls ps 
-        -- sortedDeclList = sortDeclList interDecls 
     liftIO $ writeFile "IntermediateAST.txt" ("[" ++ (intercalate ",\n" $ showIntermediateAST interDecls) ++ "]")
 
 
@@ -216,13 +212,12 @@ translates Sig to SignatureD
 {- translating Sig to SignatureD-}
 intermediateSig :: Sig GhcPs -> AST 
 intermediateSig decl = SignatureD (intermediateSigToSigs decl)             --case decl of 
-    -- TypeSig _ names typ -> 
-    --     -- let typeName = unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names)
-    --     --     sigTypes = intermediateSigType typ
-    --     -- in SignatureD (TySig {ty_name = typeName, qual_ty = [], fun_type = sigTypes, fun_bind = EmptyB })
-    -- _ -> EmptyD
 
 
+{-
+intermediateSigToSigs
+    Translates ghc-lib-parser's Sig object to intermediate AST Sigs object
+-}
 intermediateSigToSigs :: Sig GhcPs -> Sigs 
 intermediateSigToSigs decl = case decl of 
     TypeSig _ names typ -> 
@@ -302,24 +297,12 @@ translates HsBind objects into intermediate ValueD objects
 -}
 intermediateHsBind :: HsBind GhcPs -> AST 
 intermediateHsBind decl = ValueD (intermediateHsBindToBinds decl)
--- intermediateHsBind decl = case decl of 
---     FunBind _ name matches _ -> 
---         let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
---             matchPs = map (\(L _ (Match _ _ pats body)) -> 
---                 let boundVar = map intermediatePatts pats       
---                     bodyExpr = intermediateGRHSs body       
---                 in MP {bound_var = boundVar, guard_body = bodyExpr} ) (unLoc $ mg_alts matches)
-            
---             matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
-
---             boundVar = filterValidPatt $ boundVarToPatt$ transposeBoundVar matchLPats
-
---         in ValueD (FBind {fun_name = funName, patt_args = boundVar, matches = matchPs})
---     _ -> EmptyD
 
 
 {-
-
+intermediateHsBindsToBinds 
+    function that translates ghc-lib-parser AST to intermediate AST
+    returns: Intermediate AST's Binds object 
 -}
 
 intermediateHsBindToBinds :: HsBind GhcPs -> Binds 
@@ -449,26 +432,14 @@ intermediateValBinds binds sigs =
     in ValsBinds prettyBinds prettySigs
 
 {-
-let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name 
-            matchPs = map (\(L _ (Match _ _ pats body)) -> 
-                let boundVar = map intermediatePatts pats       
-                    bodyExpr = intermediateGRHSs body       
-                in MP {bound_var = boundVar, guard_body = bodyExpr} ) (unLoc $ mg_alts matches)
-            
-            matchLPats = map (\(L _ (Match _ _ pats _)) -> pats) (unLoc $ mg_alts matches)
-
-            boundVar = filterValidPatt $ boundVarToPatt$ transposeBoundVar matchLPats
+intermediateLHsBindLR 
+    function for function binding in function body
 -}
 intermediateLHsBindLR :: LHsBindLR GhcPs GhcPs -> Binds
 intermediateLHsBindLR (L _ bind) = case bind of 
     FunBind _ id matches _ -> intermediateHsBindToBinds bind
     _ -> EmptyB
-    --     let name = (occNameString . occName . unXRec @(GhcPass 'Parsed)) id 
-    --         m = map(\(L _ (Match _ c pats body)) ->
-    --             let bodyExpr = intermediateGRHSs body 
-    --             in MP {bound_var = [], guard_body = bodyExpr}) (unLoc $ mg_alts matches)
-    --     in FBinding name m 
-    -- _ -> EmptyBinding 
+
         
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
@@ -566,10 +537,6 @@ intermediateExpr = \case
         in intermediateDecideExpr n
     HsApp _ expr1 expr2 -> App (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc expr2))
     OpApp _ expr1 op expr2 -> OperApp (intermediateExpr (unLoc expr1)) (intermediateExpr (unLoc op)) (intermediateExpr (unLoc expr2))
-        -- let oper = intermediateExpr (unLoc op)
-        --     cl = if oper == ":" then reorderConsList (OpApp _ expr1 op expr2) else []
-        -- in if cl == [] then OperApp (intermediateExpr (unLoc expr1)) oper (intermediateExpr (unLoc expr2)) else ListCons cl
-
     HsPar _ _ e _ -> ParaExpr (intermediateExpr (unLoc e))
     HsLet _ _ binds _ exp -> 
         let b = intermediateLocBinds binds 

@@ -25,14 +25,14 @@ This project requires the following packages:
 In the parent directory (hs-to-lean), run the program 
 ```
 cabal build
-cabal run hs-to-lean > "output.txt"
+cabal run hs-to-lean
 ```
 
 or
 
 ```
 cabal build
-cabal run hs-to-lean <filepath> > "output.txt"
+cabal run hs-to-lean <filepath> 
 ```
 
 The Lean translation is written to a file called `LeanResult.lean` in the parent folder (hs-to-lean). 
