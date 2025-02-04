@@ -27,6 +27,7 @@ library
                     , HsToLean.SimpleAST
                     , HsToLean.ProcessFile
                     , HsToLean.ASTToLean
+                    , HsToLean.ASTToHaskell
                     , StructureAst
                     , TestFunctions
                     , HaskellToHaskell

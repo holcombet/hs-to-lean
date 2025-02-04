@@ -230,6 +230,7 @@ intermediateSigType :: LHsSigWcType GhcPs -> [Types]
 intermediateSigType = \case 
     HsWC ext body -> intermediateHsSigType (unXRec @(GhcPass 'Parsed) body)
 
+-- for Type Signature to remove FunType from type list
 intermediateHsSigType :: HsSigType GhcPs -> [Types]
 intermediateHsSigType = \case 
     HsSig ext bndrs body -> 
@@ -238,6 +239,11 @@ intermediateHsSigType = \case
             -- l = removeAllFunTy ls
         in ls
 
+
+-- for non-type signature related calls (e.g. getting derived types)
+intermediateHsSigTypes :: HsSigType GhcPs -> Types
+intermediateHsSigTypes = \case 
+    HsSig ext bndrs body -> intermediateTypes (unLoc body)
 
 
 removeFunTy :: Types -> [Types]
@@ -248,6 +254,8 @@ removeFunTy = \case
     AppTy f x-> [AppTy f x]
     ExpListTy l -> [ExpListTy l]
     FunVar f -> [FunVar f]
+    ParaTy p -> [ParaTy p]
+    EmptyT -> []
 
 
 intermediateTypes :: HsType GhcPs -> Types 
@@ -282,6 +290,10 @@ intermediateDecideTypes x
     -- | x == "Just" = FunVar LJust 
     -- | x == "Nothing" = FunVar LNothing 
     | x == "a" = FunVar LAlphaA
+    | x == "Show" = FunVar LShow
+    | x == "Eq" = FunVar LEq
+    | x == "Enum" = FunVar LEmpty 
+    | x == "Bounded" = FunVar LEmpty 
     | otherwise = TypeVar x 
 
 extractArgs :: HsType GhcPs -> [HsType GhcPs]
@@ -395,7 +407,8 @@ Guards (GRHSs, GRHS, etc...) for function body (and other things)
 intermediateGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> GuardRHSs
 intermediateGRHSs (GRHSs _ grhss binds) = 
     let sb = map intermediateGRHS grhss 
-        bndr = EmptyLocBinds         -- TODO: implement LocalBinds
+        -- bndr = EmptyLocBinds         -- TODO: implement LocalBinds
+        bndr = intermediateLocBinds binds 
     in Guards {guard_exprs = sb, loc_binds = bndr}
 
 
@@ -422,7 +435,6 @@ intermediateLocBinds :: HsLocalBinds GhcPs -> LocBinds
 intermediateLocBinds binds = case binds of 
     EmptyLocalBinds _ -> EmptyLocBinds 
     HsValBinds _ (ValBinds _ bindlst sigs) -> intermediateValBinds bindlst sigs
-    _ -> EmptyLocBinds 
 
 intermediateValBinds :: LHsBindsLR GhcPs GhcPs -> [LSig GhcPs] -> LocBinds 
 intermediateValBinds binds sigs = 
@@ -440,6 +452,16 @@ intermediateLHsBindLR (L _ bind) = case bind of
     FunBind _ id matches _ -> intermediateHsBindToBinds bind
     _ -> EmptyB
 
+
+{- making a MatchPair -}
+
+intermediateMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs) -> [MatchPair]
+intermediateMatchGroup = \case
+    MG ext (L _ matches) _ -> map intermediateLMatch matches 
+
+intermediateLMatch :: LMatch GhcPs (LHsExpr GhcPs) -> MatchPair
+intermediateLMatch (L _ match) = case match of 
+    Match _ _ pats body -> MP (map intermediatePatts pats) (intermediateGRHSs body)
         
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
@@ -486,7 +508,20 @@ getDataDefnNewOrData (HsDataDefn _ nod _ _ _ _ _) = case nod of
 
 getDataDerivClause :: HsDataDefn GhcPs -> [Types] 
 getDataDerivClause (HsDataDefn _ nod contxt _ kind cons derv) =
-    if not (null derv) then [] else [] 
+    if not (null derv) then getHsDeriving derv else [] 
+
+
+getHsDeriving :: [LHsDerivingClause GhcPs] -> [Types]
+getHsDeriving clauses =  getHsDerivingClause  $ head clauses 
+
+getHsDerivingClause :: LHsDerivingClause GhcPs -> [Types] 
+getHsDerivingClause (L _ (HsDerivingClause _ strat ((L _ typ)))) = 
+    getDerivClauseTys typ 
+
+getDerivClauseTys :: DerivClauseTys GhcPs -> [Types]
+getDerivClauseTys tys = case tys of 
+    DctSingle _ ty -> intermediateHsSigType (unLoc ty)
+    DctMulti _ typs ->  (map intermediateHsSigTypes (map unLoc typs))
 
 --
 --
@@ -542,11 +577,22 @@ intermediateExpr = \case
         let b = intermediateLocBinds binds 
             e = intermediateExpr (unLoc exp)
         in LetExpr b e
+    HsDo _ _ es -> 
+        let e = unXRec @(GhcPass 'Parsed) es
+            s = map unLoc e 
+        in DoExprs (map intermediateStmts s)
+    HsCase _ exp matches -> CaseExpr (intermediateExpr (unLoc exp)) (intermediateMatchGroup matches)
     HsIf _ exp1 exp2 exp3 -> IfExpr (intermediateExpr (unLoc exp1)) (intermediateExpr (unLoc exp2)) (intermediateExpr (unLoc exp3))
     ExplicitList _ exprs -> ExpList (map intermediateLExpr exprs)
     HsOverLit _ lit -> Litr (intermediateOverLits lit)
     HsLit _ lit -> Litr (intermediateLits lit)
     _ -> Other
+
+intermediateStmts :: StmtLR GhcPs GhcPs (GenLocated SrcSpanAnnA (HsExpr GhcPs)) -> Stmts 
+intermediateStmts s = case s of 
+    BodyStmt _ expr _ _ -> BodyStmts (intermediateLExpr expr) 
+    BindStmt _ pat body -> BindStmts (intermediatePatts  pat) (intermediateLExpr body)
+    _ -> EmptyS
 
 
 {-
@@ -558,11 +604,15 @@ intermediateDecideExpr :: String -> Exprs
 intermediateDecideExpr x
     | x == "putStrLn" = SpecialVar VPutStrLn
     | x == "putStr" = SpecialVar VPutStr
+    | x == "print" = SpecialVar VPrint
     | x == "Just" = SpecialVar VJust 
     | x == "Nothing" = SpecialVar VNothing
     | x == "Left" = SpecialVar VLeft
     | x == "Right" = SpecialVar VRight
     | x == "pi" = SpecialVar VPi
+    | x == "show" = SpecialVar VShow
+    | x == "True" = SpecialVar VTrue 
+    | x == "False" = SpecialVar VFalse
     | otherwise = Var x
 
 
@@ -599,6 +649,7 @@ intermediatePatts (L _ pat) = case pat of
             PrefixCon _ _ -> ConPatt {con_type = conName, patt_details = patDetails}
             InfixCon _ _ -> ConPatt {con_type = conName, patt_details = patDetails}
     ParPat _ tokLeft pat tokRight -> ParPatt (intermediatePatts pat)
+    WildPat _ -> WildPatt
     _ -> VariPatt "Not Implemented"
 
 

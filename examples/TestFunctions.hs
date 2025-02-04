@@ -21,6 +21,8 @@ data Tree a = Empty | Node a (Tree a) (Tree a)      -- data : QualTy and multipl
 
 data Tree2 = Nil | Nod Int Tree2 Tree2
 
+
+
 ----------------------------
 -- functions
 ----------------------------
@@ -92,6 +94,34 @@ insertionSort (x:xs) = insert x (insertionSort xs)
 
 applyFunc :: (Int -> Int) -> Int -> Int
 applyFunc f x = f x
+
+
+circleArea :: Float -> Float
+circleArea radius = piVal * radiusSquared
+  where
+    piVal = 3.14159          
+    radiusSquared = radius * radius 
+
+-- test case keyword -- requires partial def
+-- pad :: Int -> String
+-- pad day = case show day of
+--     [c] -> [' ', c]
+--     cs  -> cs
+
+
+
+data DayOfWeek
+    = Sunday | Monday | Tuesday | Wednesday | Thursday | Friday | Saturday
+    deriving (Show, Eq, Enum, Bounded)
+
+
+
+
+
+main = do 
+  print $ calculateArea 2
+  putStrLn "Hello World!"
+  print $ calculateRandom 2
 --------------------------------------
 -- Currently un-used test functions
 --------------------------------------
@@ -126,7 +156,15 @@ applyFunc f x = f x
 
 
 
-
+-- isPrime :: Int -> Bool
+-- isPrime n
+--   | n <= 1    = False
+--   | otherwise = not (hasDivisor 2)
+--   where
+--     hasDivisor d
+--       | d * d > n      = False
+--       | n `mod` d == 0 = True
+--       | otherwise      = hasDivisor (d + 1)
 
 
 -- -- test case keyword
@@ -265,7 +303,7 @@ applyFunc f x = f x
 
 -- heapSort = tree2list . heapify 
 
-main = putStr "Hello World"
+
 
 
 -- -- Pattern Matching Examples to Translate to Lean

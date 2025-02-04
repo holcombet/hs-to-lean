@@ -38,6 +38,7 @@ import HsToLean.TranslateHaskell (translateToLean)
 import HsToLean.SimpleAST (generateSimpleAST)
 import HsToLean.ProcessFile (getIntermediateAST, generateIntermediateAST, showIntermediateAST)
 import HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs)
+import HsToLean.ASTToHaskell (astListToHaskell, astToHaskell)
 
 -- import TestAST 
 
@@ -102,7 +103,9 @@ main = do
       liftIO $ writeFile "AST.txt" (gshow astForLean)                 -- printing ghc-lib-parser ast to file
       liftIO $ structAst "AST.txt"                                    -- generate & write structured ast to file
 
-      -- liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
-      -- liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
+      liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
+      liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
 
+      liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
+      liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
 

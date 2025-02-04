@@ -422,10 +422,23 @@ prettyHsExpr = \case
   HsLet _ tok1 binds tok2 exp -> "\n\tlet\n" ++ indent(indent (prettyLocalBinds binds)) ++ "\tin " ++ prettyHsExpr (unLoc exp)
   -- TODO: HsLam, NegApp, ExplicitTuple, ExplicitSum, HsMultiIf, HsDo, ExplicitList
   -- TODO: others tbd
+  HsDo _ flav expStm -> 
+    let e = (unXRec @(GhcPass 'Parsed) expStm) 
+        s = map unLoc e
+    in "do\n" ++ unlines (map prettyExprLStmt s)
   ExplicitTuple _ tupleArgs boxity -> 
     let tupleContent = intercalate ", " (map prettyTupleArg tupleArgs)
     in if isBoxed boxity then "(" ++ tupleContent ++ ")" else "(#" ++ tupleContent ++ "#)"
   _ -> "HsExpr Not implemented"
+
+
+prettyExprLStmt :: (StmtLR GhcPs GhcPs (GenLocated SrcSpanAnnA (HsExpr GhcPs))) -> String 
+prettyExprLStmt s =  case s of 
+  BodyStmt _ expr _ _ -> prettyLHsExpr expr
+  LetStmt _ binds -> "Let not implemented"
+  BindStmt _ pat body -> prettyPat pat ++ " <- " ++ prettyLHsExpr body
+  _ -> "Not implemented"
+
 
 
 prettyTupleArg :: HsTupArg GhcPs -> String
