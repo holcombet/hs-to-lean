@@ -18,6 +18,7 @@ astToLean = \case
     SignatureD s -> sigToLean s 
     ValueD v -> implicitBindsToLean v 
     TyClassD t -> tyClToLean t 
+    InstancesD i -> instanceToLean i
     _ -> ""
 
 
@@ -32,7 +33,13 @@ sigToLean = \case
             specialCase = containsCase funBind 
         -- in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind   then valBindsToLean tyName funBind else bindsToLean funBind) 
         in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
-    -- _ -> "Not Implemented"
+    ClassSigs isDefault names sigTy -> 
+        let d = if isDefault then "default" else "" 
+            nameStr = unwords names 
+            typeStr = map processType sigTy 
+        in nameStr ++ " : " ++ intercalate " -> " typeStr 
+
+    _ -> "Not Implemented"
 
 
 -- functions for value binding functions
@@ -80,6 +87,8 @@ bindsToLean = \case
 --         _ -> False
 --     _ -> False
 
+
+
 {-
 For let statements
 -}
@@ -87,6 +96,18 @@ bindingsToLean :: Binds -> String
 bindingsToLean = \case 
     FBind name a e -> name ++ " " ++ unwords a++ " := " ++ unwords (map singleMatchPairToLean e)
     _ -> "Bindings Not Implemented" 
+
+
+{-
+for instance binds (because it works differently)
+-}
+instanceBindsToLean :: Binds -> String 
+instanceBindsToLean = \case 
+    FBind name a e -> 
+        let var = if a == [""] && length e > 1 then generateVarNames (1) else a 
+            ms = if length e == 1 then map singleMatchPairToLean e else  map matchpairToLean e 
+        in name ++ " " ++ unwords var ++ " := " ++ (if length e > 1 then "\nmatch " ++ intercalate ", " var ++ " with\n" ++ unlines (map ("| "++) ms) else unlines ms)
+    _ -> "Instance Binding not implemented"
 
 {-
 getConstantFunBody, getFunBody, and getConst
@@ -265,6 +286,12 @@ tyClToLean = \case
             in "inductive " ++ name ++ (if not (null tyVar) then " " ++ unwords (formatParameterizedQTyVar tyVar) else "") ++ " where\n" ++ intercalate "\n" (map ("| "++) consLines)
                 ++ (if null derivTy then "" else "\nderiving " ++ intercalate ", " (removeEmptyStrFromList derivTy) )++ "\n\n" ++ "open " ++ name ++ "\n\n"
             -- UNFINISHED
+    ClassDecls name qualT msigs dmet -> 
+        let qt = formatParameterizedQTyVar qualT 
+            s = map sigToLean msigs 
+            dm = map bindsToLean dmet
+            openStmt = "open " ++ name ++ "\n"
+        in "class " ++ name ++ " " ++ unwords qt ++ " where\n" ++ unlines (map ("    "++) s) ++ "\n" ++ openStmt
     _ -> "TyClassDecls Not Implemented"
 
 -- returns just the constructor details
@@ -336,6 +363,30 @@ unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
 ---------------------------------------------------------------
 ---------------------------------------------------------------
 
+instanceToLean :: InstDecls -> String 
+instanceToLean i = case i of 
+    ClassInst ty bind es -> 
+        let t =  map addParenToType (map processType ty)
+            b = map instanceBindsToLean bind 
+            s = map sigToLean es
+        in "instance : " ++ unwords t ++ " where\n" ++  unlines b
+    EmptyID -> "Instance not implemented"
+
+
+addParenToType :: String -> String
+addParenToType x = 
+    let ws = words x 
+    in unwords (findListType ws)
+
+
+findListType :: [String] -> [String]
+findListType [] = [] 
+findListType [x] = [x]
+findListType (x : y : xs) = 
+    if x == "List" then ("(" ++ x ++ " " ++ y ++ ")") : findListType xs else x : findListType (y : xs)
+---------------------------------------------------------------
+---------------------------------------------------------------
+
 {- Functions for Types -}
 
 processType :: Types -> String
@@ -353,7 +404,7 @@ processType = \case
         LShow -> "Repr"
         LEq -> "DecidableEq"
         LEmpty -> ""
-        _ -> "FunType not "
+        -- _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
     AppTy ty1 ty2 -> processType ty1 ++ " " ++ processType ty2
         -- let p1 = processType1
@@ -389,9 +440,9 @@ processPatt = \case
     ListPatt p1 -> "[" ++ intercalate ", " (map processPatt p1) ++ "]"
     ConPatt ty det -> 
         let patDetails = getConPattDetails det 
-            con_ty = if ty == ":" then " :: " else ty
+            con_ty = convertConTy ty
         in case det of 
-            ConPattPrefix p -> ty ++ " " ++ if null p then "" else  unwords (map processPatt p)--con_ty               -- TODO: something might be missing here...
+            ConPattPrefix p -> con_ty ++ " " ++ if null p then "" else  unwords (map processPatt p)--con_ty               -- TODO: something might be missing here...
             ConPattInfix _ _ ->  intercalate con_ty patDetails
                 -- if con_ty == " :: " then unwords (map ("List.con " ++ ) patDetails) else intercalate con_ty patDetails
     LitPatt l -> processLits l 
@@ -400,6 +451,12 @@ processPatt = \case
 processPattArgs :: [Patts] -> [String]
 processPattArgs = map processPatt
 
+convertConTy :: String -> String 
+convertConTy x 
+    | x == ":" = " :: "
+    | x == "Just" = "some"
+    | x == "Nothing" = "none"
+    | otherwise = x
 
 getConPattDetails :: ConPattDetails -> [String]
 getConPattDetails x = case x of 
@@ -451,7 +508,7 @@ processExprs = \case
         let ex = processExprs e 
             caseBod = map matchpairToLeanWithToString mp
         in "match " ++ (if head (words ex) == "toString" then "(" ++ ex ++ ").data" else ex) ++ " with\n" ++ unlines (map ("| "++) caseBod)
-    DoExprs s -> "do\n" ++ unlines (map processStmts s)
+    DoExprs s -> "do\n" ++ unlines (map ("    "++) (map processStmts s))
     IfExpr e1 e2 e3 -> "if " ++ processExprs e1 ++ " then " ++ processExprs e2 ++ " else " ++ processExprs e3
     ExpList es -> "[" ++ intercalate ", " (map processExprs es) ++ "]"
     Litr l -> processLits l

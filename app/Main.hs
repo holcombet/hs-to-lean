@@ -90,6 +90,8 @@ main = do
 
       let astForLean = pm_parsed_source parsedModule      -- makes ParsedSource object, used for all translation modules
       
+
+      ----
       liftIO $ generateIntermediateAST astForLean         -- generate intermediate AST and write to file (reference file)
 
       let interAST = findASTPairs (getIntermediateAST astForLean)   -- make (intermediate) AST object 
@@ -97,15 +99,17 @@ main = do
       liftIO $ putStrLn "\n\n"
       liftIO $ writeFile "LeanResult.lean" (intercalate "\n\n" (astListToLean interAST))    -- translate AST to lean and write to file
 
+      -----
+
       {-
       Following lines are for generating resources for testing and debugging
       -}
       liftIO $ writeFile "AST.txt" (gshow astForLean)                 -- printing ghc-lib-parser ast to file
       liftIO $ structAst "AST.txt"                                    -- generate & write structured ast to file
 
-      liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
+      -- liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
       liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
 
-      liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
-      liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
+      -- liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
+      -- liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
 

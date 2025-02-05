@@ -198,6 +198,7 @@ intermediateDecls = \case
     ValD _ decl -> intermediateHsBind decl
     SigD _ decl -> intermediateSig decl
     TyClD _ decl -> intermediateTyClDecl decl 
+    InstD _ decl -> intermediateInstDecl decl 
     _ -> EmptyD
 
 ---------------------------------------------------------------------
@@ -224,6 +225,10 @@ intermediateSigToSigs decl = case decl of
         let typeName = unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names)
             sigTypes = intermediateSigType typ 
         in TySig {ty_name = typeName, qual_ty = [], fun_type = sigTypes, fun_bind = EmptyB}
+    ClassOpSig _ isDefault n typ -> 
+        let name = map (occNameString . occName . unLoc) n
+            typeS = intermediateHsSigType (unLoc typ )
+        in ClassSigs {is_default = isDefault, names = name, sig_ty = typeS}
     _ -> EmptySig
 
 intermediateSigType :: LHsSigWcType GhcPs -> [Types]
@@ -486,8 +491,17 @@ intermediateTyClDecl decl = case decl of
             dataDefnCons = getDataCons dataDef
             typeData = getDataDefnNewOrData dataDef 
         in TyClassD (DataDecls {defn_type = typeData, data_name = dataName, qualTy_var = tyVarStr, dataDefn_cons = dataDefnCons, deriv_clause = dataDeriv})
+    ClassDecl _ cntxt tyCon tyVar fix _ metSig mets _ _ _ -> 
+        let className = (occNameString . occName . unXRec @(GhcPass 'Parsed)) tyCon 
+            tyVarStr = intermediateQTyVars tyVar 
+            methodS = map intermediateSigToSigs (map unLoc metSig)
+            defaultMet = map intermediateLHsBindLR (intermediateConvertLHsBindsToLHsBindLR mets)
+        in TyClassD (ClassDecls {class_name = className, qualTy_var = tyVarStr, method_sigs = methodS, default_method = defaultMet})
     _ -> EmptyD
 
+
+intermediateConvertLHsBindsToLHsBindLR :: LHsBinds GhcPs -> [LHsBindLR GhcPs GhcPs]
+intermediateConvertLHsBindsToLHsBindLR b = bagToList b
 
 --
 
@@ -557,6 +571,28 @@ getConDeclH98Details details = case details of
 
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
+
+{-
+Instance Declarations
+-}
+
+intermediateInstDecl :: InstDecl GhcPs -> AST 
+intermediateInstDecl decl = case decl of 
+    ClsInstD _ ci -> case ci of 
+        ClsInstDecl _ sigTys bind sigs _ _ _ -> 
+            let st = intermediateHsSigType (unLoc sigTys)
+                b = map intermediateLHsBindLR (intermediateConvertLHsBindsToLHsBindLR bind)
+                ss = map (intermediateSigToSigs . (unXRec @(GhcPass 'Parsed))) sigs
+            in  InstancesD  (ClassInst {inst_ty = st, binds = b, exp_sigs = ss})
+    _ -> InstancesD (EmptyID)
+
+
+
+
+
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+
 
 {-
 Exprs

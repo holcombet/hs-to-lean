@@ -1,31 +1,49 @@
 module Simple where 
     
-type Name = Int
 
-data Expr
-  = Var Name
-  | Let Name Expr Expr
-  | Lam Name Expr
-  | App Expr Expr
+{- Testing class declarations and instance declarations -}
 
--- Data.Foldable.maximum is a partial function (fails when the list is empty)
--- So we use a total version that requires a nonempty list.
-maxName :: Name -> [Name] -> Name
-maxName n ns = foldr max n ns
+class YesNo a where 
+  yesno :: a -> Bool 
 
-maxVar :: Expr -> Int
-maxVar (Var n)       = n
-maxVar (Let n e1 e2) = maxName n [maxVar e1, maxVar e2]
-maxVar (Lam n e)     = maxName  n [maxVar e]
-maxVar (App e1 e2)   = maxName (maxVar e1) [maxVar e2]
+instance YesNo Int where 
+  yesno 0 = False 
+  yesno _ = True 
 
-fresh :: Expr -> Int
-fresh e = 1 + maxVar e
+instance YesNo [a] where 
+  yesno [] = False 
+  yesno _ = True 
 
-anf :: Expr -> Expr
-anf (Var n)          = Var n
-anf (Let n rhs body) = Let n (anf rhs) (anf body)
-anf (Lam n body)     = Lam n (anf body)
-anf (App f (Var n))  = App (anf f) (Var n)
-anf (App f e)        = Let v (anf e) (App (anf f) (Var v))
-  where v = fresh f
+instance YesNo Bool where 
+  yesno = id 
+
+instance YesNo (Maybe a) where 
+  yesno (Just _) = True 
+  yesno Nothing = False 
+
+
+
+main = do 
+  -- print $ yesno $ 3
+  -- print $ yesno "haha"
+  -- print $ yesno ""
+  print $ yesno $ Just 0
+  print $ yesno True 
+  -- print $ yesno [] 
+  print $ yesno [1,2,3]
+
+
+
+-- addVals :: Int -> Int -> Int 
+-- addVals a b = a + b 
+
+
+-- random :: Int -> [Int] -> Int 
+-- random x [] = x 
+-- random x (y:ys) = x - 1
+
+
+-- insert :: Int -> [Int] -> [Int]
+-- insert x [] = [x]
+-- insert x (y:ys) = if x < y then x:y:ys else y : insert x ys
+

@@ -16,6 +16,9 @@ astToHaskellTranslation.txt
 astToHaskellTranslation.hs 
 
 
+
+
+
 # ignore all non-.hs files in examples
 examples/*
 !examples/*.hs

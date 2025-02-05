@@ -29,7 +29,6 @@ library
                     , HsToLean.ASTToLean
                     , HsToLean.ASTToHaskell
                     , StructureAst
-                    , TestFunctions
                     , HaskellToHaskell
 
                     

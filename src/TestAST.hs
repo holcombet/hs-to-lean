@@ -11,6 +11,7 @@ data AST
     = SignatureD Sigs
     | ValueD Binds
     | TyClassD TyClassDecls
+    | InstancesD InstDecls 
     | EmptyD
     deriving (Eq, Show)
     
@@ -25,6 +26,12 @@ data Sigs
                 fun_type :: FunType,
                 fun_bind :: Binds
             }
+    | ClassSigs 
+            {
+                is_default  :: Bool,
+                names       :: [String],
+                sig_ty      :: [Types]
+            }
     | EmptySig
     deriving (Eq, Show)
 
@@ -32,6 +39,21 @@ data Sigs
 type Context = [Types]
 type FunType = [Types]
 
+-- data SigTys = SigTys OuterSigBndrs Types 
+--     deriving (Eq, Show)
+
+-- type OuterSigBndrs = String 
+
+
+data InstDecls 
+    = ClassInst 
+        {
+            inst_ty     :: [Types],
+            binds       :: [Binds],
+            exp_sigs    :: [Sigs]
+        }
+    | EmptyID
+    deriving (Eq, Show)
 
 data Binds 
     = FBind 
@@ -132,6 +154,13 @@ data TyClassDecls
             qualTy_var      :: QTyVar,
             dataDefn_cons   :: [DefnConsDetails],
             deriv_clause    :: [Types]
+        }
+    | ClassDecls 
+        {
+            class_name      :: String,
+            qualTy_var      :: QTyVar,
+            method_sigs     :: [Sigs],
+            default_method  :: [Binds]
         }
     | EmptyTC
     deriving (Eq, Show)

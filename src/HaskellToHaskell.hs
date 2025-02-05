@@ -65,34 +65,35 @@ prettyHsDecl = \case
           dataDefStr = prettyHsDataDefn dataDef
           typedata = getHsDataDefnNewOrData dataDef
       in typedata ++ " " ++ dataName ++ " " ++ tyVarStr ++ " = " ++ dataDefStr ++ "\n"
+    ClassDecl _ cntxt tyCon tyVar fix _ metSig mets _ _ _ -> 
+      let className = (occNameString . occName . unXRec @(GhcPass 'Parsed)) tyCon 
+          tyVarStr = prettyLHsQTyVars tyVar 
+          methodS = map prettySig (map unLoc metSig)
+          defaultMet =  map prettyLHsBindLR (convertLHsBindsToLHsBindLR mets)
+
+      in "class " ++ className ++ " " ++ tyVarStr ++ " where \n    " ++ unlines methodS ++ unlines defaultMet  
     _ -> "Not implemented"
   -- TODO: InstD, DerivD
-  ValD _ decl -> prettyHsBind decl--case decl of 
-    -- FunBind _ name matches _ -> 
-    --   let funName = (occNameString . occName . unXRec @(GhcPass 'Parsed)) name -- no gshow = no "" around function name
-    --       matchStrings = map (\(L _ (Match _ c pats body)) ->
-    --         let argStrings = funName ++ " " ++ unwords (map prettyPat pats)
-    --             bodyString = prettyGRHSs body
-    --             indent = if hasGuards body then replicate (length argStrings) ' ' else ""
-    --         in argStrings ++  bodyString) (unLoc $ mg_alts matches)
-    --       -- indent = if any hasGuards (map (\(L _ (Match _ c pats body)) -> body ) (unLoc $ mg_alts matches)) then replicate (length funName) ' ' else ""
-    --         -- in argStrings ++ " = " ++ bodyString) (unLoc $ mg_alts matches)
-    --   in  unlines matchStrings
-    -- PatBind _ pat rhs _ -> prettyPat pat ++ " = " ++ prettyGRHSs rhs
-    -- VarBind _ var_id rhs -> gshow var_id ++ " = " ++ prettyLHsExpr rhs
-    -- TODO: PatSynBind
-    -- _ -> prettyPrint $ gshow decl
-  SigD _ decl -> prettySig decl --case decl of
-    -- TypeSig _ names typ -> unwords (map ( occNameString . occName . unXRec @(GhcPass 'Parsed)) names)  ++ " :: " ++ prettyLHsSigWcType typ
-    -- PatSynSig _ names typ -> unwords (map (occNameString . occName . unXRec @(GhcPass 'Parsed)) names) ++ " :: " ++ prettyLHsSigType typ
-    -- ClassOpSig _ isDefault names typ ->
-    --   let defaultStr = if isDefault then "default " else ""
-    --       nameStr = unwords $ map (occNameString . occName . unLoc) names
-    --       typeStr = prettyLHsSigType typ
-    --   in defaultStr ++ nameStr ++ " :: " ++ typeStr
-    -- _ -> "Not implemented"
+  InstD _ decl -> prettyInstDecl decl
+  ValD _ decl -> prettyHsBind decl
+
+  SigD _ decl -> prettySig decl 
+
   _ -> "Not implemented"
 
+convertLHsBindsToLHsBindLR :: LHsBinds GhcPs -> [LHsBindLR GhcPs GhcPs]
+convertLHsBindsToLHsBindLR b = bagToList b 
+
+
+prettyInstDecl :: InstDecl GhcPs -> String 
+prettyInstDecl decl = case decl of 
+  ClsInstD _ ci -> case ci of 
+    ClsInstDecl _ sigTys bind sigs _ _ _ -> 
+      let st = prettyLHsSigType sigTys 
+          b =  lines (unlines (map prettyLHsBindLR (convertLHsBindsToLHsBindLR bind)))
+          ss = map prettySig (map (unXRec @(GhcPass 'Parsed) ) sigs)
+      in "instance " ++ st ++ " where\n" ++ unwords (map ("    "++) ss) ++ unlines (map ("    "++) b )
+  _ -> "instance decl not implemented"
 
 
 prettyHsBind :: HsBind GhcPs -> String
