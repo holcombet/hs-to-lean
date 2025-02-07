@@ -24,26 +24,6 @@ instance YesNo (Maybe a) where
 
 
 main = do 
-  -- print $ yesno $ 3
-  -- print $ yesno "haha"
-  -- print $ yesno ""
   print $ yesno $ Just 0
   print $ yesno True 
-  -- print $ yesno [] 
   print $ yesno [1,2,3]
-
-
-
--- addVals :: Int -> Int -> Int 
--- addVals a b = a + b 
-
-
--- random :: Int -> [Int] -> Int 
--- random x [] = x 
--- random x (y:ys) = x - 1
-
-
--- insert :: Int -> [Int] -> [Int]
--- insert x [] = [x]
--- insert x (y:ys) = if x < y then x:y:ys else y : insert x ys
-

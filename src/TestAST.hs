@@ -118,10 +118,10 @@ data SVar
     | VJust
     | VLeft
     | VRight
-    | VShow
     | VPi
     | VTrue 
     | VFalse
+    | VShow
     | EmptyV 
     deriving (Eq, Show)
 data LocBinds 
@@ -192,14 +192,10 @@ data Types
 data FVar 
     = LRational     
     | LEither
-    -- | LLeft 
-    -- | LRight
     | LMaybe
-    | LAlphaA
-    -- | LJust
-    -- | LNothing
     | LShow         -- typeclass
     | LEq           -- typeclass 
+    | LAlphaA       -- universal a
     | LEmpty   -- placeholder
     deriving (Eq, Show)
 data Patts 

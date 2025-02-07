@@ -6,9 +6,10 @@ module HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs) where
 import TestAST
 
 import Data.List (intercalate)
--- import qualified GHC.Data.ShortText as T
 
-
+{-
+astListToLean and astToLean: Process AST type to Lean code
+-}
 
 astListToLean :: [AST] -> [String]
 astListToLean = map astToLean 
@@ -22,51 +23,56 @@ astToLean = \case
     _ -> ""
 
 
--- tester function to convert Sigs type to Lean code
+{-
+sigToLean: translate Sigs objects to Lean code
+-}
+
 sigToLean :: Sigs -> String
 sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
             funTyList = processFunType funTy        -- parameter types
-            retTy = last funTyList      -- return type
+            retTy = last funTyList                  -- return type
             isValBind = length funTyList == 1
             specialCase = containsCase funBind 
-        -- in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind   then valBindsToLean tyName funBind else bindsToLean funBind) 
         in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
     ClassSigs isDefault names sigTy -> 
         let d = if isDefault then "default" else "" 
             nameStr = unwords names 
             typeStr = map processType sigTy 
         in nameStr ++ " : " ++ intercalate " -> " typeStr 
-
     _ -> "Not Implemented"
 
 
--- functions for value binding functions
-getFirstTy :: Types -> String
-getFirstTy = \case 
-    TypeVar v -> v 
-    AppTy typ1 typ2 -> processType typ1
+{-
+function that types funtypes and funbinds and returns function arguments in lean format (a : Type)
+-}
+getBoundVar :: FunType -> Binds -> String
+getBoundVar funTy funBind = thing
+    where 
+        listTys = init (processFunType funTy)
+        listBinds = case funBind of
+            FBind name args match ->  args 
+            _ -> []
+        pairedLists = zip listBinds listTys 
+        thing = unwords (unzipBindTyList pairedLists)
 
-valBindsToLean :: String -> Binds -> String 
-valBindsToLean ty bind = case bind of 
-    -- FBind name args match -> ty ++ if not (null args) then " " ++ intercalate ", " ( args) else ""  ++ " = " ++ unlines (map matchpairToLean match)  -- intercalate ", " match  -- body not finished... but at least it's something
-    FBind name args match -> 
-        let bod = (map getConstantFunBody match)  
-        in if length bod == 1 then unlines bod else bindsToLean bind
-    _ -> ""
 
 
--------
-
+{-
+implicitBindsToLean: 
+    function that translates implicitly-typed functions
+-}
 implicitBindsToLean :: Binds -> String 
 implicitBindsToLean = \case 
     FBind name args match -> 
-        -- if length match == 1  then unlines ( map singleMatchPairToLean match)
         "def " ++ name ++ " " ++ unwords args ++ " := " ++ unlines (map singleMatchPairToLean match)
     _ -> ""
 
--- tester function to convert Binds type to Lean code
+{-
+bindsToLean:
+    translates Binds objects to Lean code
+-}
 bindsToLean :: Binds -> String
 bindsToLean = \case
     FBind name args match -> 
@@ -78,19 +84,9 @@ bindsToLean = \case
             in matchStmt  ++ intercalate "" (map removeTrailingWhitespace matches)
     _ -> ""
        
--- mpNotCaseExpr :: MatchPair -> Bool 
--- mpNotCaseExpr (MP _ bod) = case bod of 
---     Guards e _ -> case e of 
---         [StmtBody _ ex] -> case ex of 
---             CaseExpr _ _ -> True 
---             _ -> False 
---         _ -> False
---     _ -> False
-
-
 
 {-
-For let statements
+For non-do notation let statements
 -}
 bindingsToLean :: Binds -> String 
 bindingsToLean = \case 
@@ -109,10 +105,11 @@ instanceBindsToLean = \case
         in name ++ " " ++ unwords var ++ " := " ++ (if length e > 1 then "\nmatch " ++ intercalate ", " var ++ " with\n" ++ unlines (map ("| "++) ms) else unlines ms)
     _ -> "Instance Binding not implemented"
 
+
 {-
 getConstantFunBody, getFunBody, and getConst
 
-functions for getting the a constant function body
+    functions for getting the a constant function body
 -}
 getConstantFunBody :: MatchPair -> String 
 getConstantFunBody (MP pvar bod) = getFunBody bod
@@ -128,7 +125,9 @@ getConst (StmtBody sm expr) = processExprs expr
 
 
 {-
-containsCase
+containsCase, mpContainsCase, getExprFromGuard, getExprFromStmt
+    
+    Functions that translates "case" expression into Lean code (if/then/else)
 -}
 
 containsCase :: Binds -> Bool 
@@ -153,7 +152,7 @@ getExprFromStmt (StmtBody sm expr) = case expr of
 {-
 singleMatchpairToLean, singleGuardRHSsToLean, and singleGuardRHSToLean 
 
-functions for getting guard body for constant functions
+    functions for getting guard body for constant functions
 -}
 
 singleMatchPairToLean :: MatchPair -> String 
@@ -180,17 +179,24 @@ singleGuardRHSToLean (StmtBody sm epr) =
     in guardStmts ++ exprStr
 
 
+
 {-
-matchpairToLean, guardRHSsToLean, and guardRHSToLean 
+matchpairToLeanWithToString
+    function for functions that pattern match against strings and return strings as lists of chars
 
-functions for getting guard body for non-constant functions
 -}
-
 matchpairToLeanWithToString :: MatchPair -> String 
 matchpairToLeanWithToString (MP pvar bod) = 
     let args = intercalate ", " (processPattArgs pvar)
         bodystring = words (guardRHSsToLean bod)
     in args ++ head bodystring ++ " " ++ "String.mk (" ++ unwords (tail bodystring) ++ ")"
+
+
+{-
+matchpairToLean, guardRHSsToLean, and guardRHSToLean 
+
+    functions for getting guard body for non-constant functions
+-}
 
 matchpairToLean :: MatchPair -> String
 matchpairToLean (MP pvar bod) = 
@@ -199,9 +205,6 @@ matchpairToLean (MP pvar bod) =
     in args ++ bodystring
 
 
-
-
-{- works but adds an unwanted "else" if no otherwise-}
 guardRHSsToLean :: GuardRHSs -> String 
 guardRHSsToLean = \case 
     EmptyG -> "Guard Not Implemented"
@@ -211,19 +214,18 @@ guardRHSsToLean = \case
             bndr =  processLocBindsToLean loc
             guardBody = if last guardEnd == "else" then unlines (init guards) ++  unwords (init guardEnd) else unlines guards
         in " => " ++ guardBody ++ (if bndr == "" then "" else "where\n" ++ bndr)
-        -- in " => " ++ (if last guardEnd == "else" then unlines (init guards) ++  unwords (init guardEnd) else unlines guards) ++ (if bndr == "" then "" else "where\n\t" ++ bndr)
-        -- in " => " ++ unlines guards ++ if bndr == "" then "" else "\n"
+
     
 guardRHSToLean :: GuardRHS -> String 
 guardRHSToLean (StmtBody sm epr) = 
-    let guardStmts = if null sm then "" else --if null sm then " => " else --"Lean Guards not Implemented"
+    let guardStmts = if null sm then "" else 
             let stm = guardStmtsToLean sm 
             in "\n" ++ if null stm ||  stm == "" then "" else stm ++ " then "
-        exprStr = if null sm then processExprs epr else --"Lean Guards Not Implemented"
+        exprStr = if null sm then processExprs epr else 
             let ex = processExprs epr 
             in if guardStmts == "" then ex else ex ++ " else"
     in guardStmts ++ exprStr
-{--}
+
 
 
 {-
@@ -248,7 +250,7 @@ guardStmtToLean = \case
 {-
 locBindsToLean
 
-Converting local binds to Lean binding stmts/exprs
+    Converting local binds to Lean binding stmts/exprs
 -}
 
 processLocBindsToLean :: LocBinds -> String
@@ -265,27 +267,37 @@ processLocBindsToLean bind = case bind of
 ---------------------------------------------------------------
 
 
--- tester function to convert TyClDecls to Lean code
+{-
+tyClToLean
+    Function that converts TyClass objects to Lean code
+-}
 tyClToLean :: TyClassDecls -> String
 tyClToLean = \case 
-    SynDecls name tyVar body ->
+    -- type synonyms
+    SynDecls name tyVar body ->             
         let qtv = if not (null tyVar) then unwords tyVar else ""
             sb = processType body 
         in "abbrev " ++ name ++ " " ++ qtv ++ " := " ++ sb 
+
+    -- data declarations
     DataDecls defTy name tyVar defnCons deriv -> case defTy of 
+        -- newtype
         NewTy -> 
             let consList = map getConsDetails defnCons 
                 consNames = map getConsNames defnCons 
 
             in ""
+
+        -- data
         DataTy -> 
-            let consList = map getConsDetails defnCons -- list of details of each constructor
+            let consList = map getConsDetails defnCons 
                 consNames = map getConsNames defnCons
                 derivTy = map processType deriv
                 consLines = map (getDefnCons tyVar) defnCons
             in "inductive " ++ name ++ (if not (null tyVar) then " " ++ unwords (formatParameterizedQTyVar tyVar) else "") ++ " where\n" ++ intercalate "\n" (map ("| "++) consLines)
                 ++ (if null derivTy then "" else "\nderiving " ++ intercalate ", " (removeEmptyStrFromList derivTy) )++ "\n\n" ++ "open " ++ name ++ "\n\n"
-            -- UNFINISHED
+    
+    -- class declarations
     ClassDecls name qualT msigs dmet -> 
         let qt = formatParameterizedQTyVar qualT 
             s = map sigToLean msigs 
@@ -294,27 +306,35 @@ tyClToLean = \case
         in "class " ++ name ++ " " ++ unwords qt ++ " where\n" ++ unlines (map ("    "++) s) ++ "\n" ++ openStmt
     _ -> "TyClassDecls Not Implemented"
 
--- returns just the constructor details
+{-
+returns just the constructor details
+-}
 getConsDetails :: DefnConsDetails -> [Types]
 getConsDetails = \case 
     DefnConsDetail name typs -> typs
 
--- returns just the constructor name
+{-
+returns just the constructor name
+-}
 getConsNames :: DefnConsDetails -> String
 getConsNames = \case
     DefnConsDetail name _ -> name
 
 
--- helper functions that get the parameterized type to be of the format (a : Type) etc. 
+{-
+formatParameterizedQTyVar, formatParameterizedTyp
+    Helper functions that get the parameterized type to be of the format (a : Type), etc.
+-}
 formatParameterizedQTyVar :: QTyVar -> [String]
 formatParameterizedQTyVar = map formatParameterizedTyp
 
--- helper functions that get the parameterized type to be of the format (a : Type) etc. 
 formatParameterizedTyp :: String -> String
 formatParameterizedTyp x = "(" ++  x ++ " : Type)"
 
 
--- returns a string containing construction line (constructor + types)
+{-
+returns a string containing construction line (constructor + types)
+-}
 getDefnCons :: QTyVar -> DefnConsDetails -> String 
 getDefnCons tyVar det = case det of 
     DefnConsDetail name typs -> 
@@ -324,7 +344,9 @@ getDefnCons tyVar det = case det of
         in name ++ " " ++ unwords formatTypes
 
 
--- formats constructor types into lean format e.g. (a : Type)
+{-
+formats constructor types into lean format
+-}
 formatConTy :: [String] -> [String] -> [String]
 formatConTy tempVar conVar = zipWith (\s1 s2 -> "(" ++ s1 ++ " : " ++ s2 ++ ")") tempVar conVar
 
@@ -333,27 +355,7 @@ formatConTy tempVar conVar = zipWith (\s1 s2 -> "(" ++ s1 ++ " : " ++ s2 ++ ")")
 
 
 
-
-
--- function that takes the funtypes and funbinds and returns the lean code of
--- the function arguments (e.g. (a : Int))
-getBoundVar :: FunType -> Binds -> String
-getBoundVar funTy funBind = thing
-    where 
-        listTys = init (processFunType funTy)
-        listBinds = case funBind of
-            FBind name args match ->  args 
-            -- FBind name args match -> if args == [""] then generateVarNames (length listTys) else args 
-            _ -> []
-
-        -- returnTy = last listTys
-        -- argty = init listTys
-        pairedLists = zip listBinds listTys 
-        thing = unwords (unzipBindTyList pairedLists)
-
-
--- helper functions for getBoundVar (unzipBindTyList, processType, processFunType,
-                                --   processPatt, processPattArgs)
+-- helper function
 unzipBindTyList :: [(String, String)] -> [String]
 unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
 
@@ -362,7 +364,9 @@ unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
 
 ---------------------------------------------------------------
 ---------------------------------------------------------------
-
+{-
+Function(s) for instance declarations
+-}
 instanceToLean :: InstDecls -> String 
 instanceToLean i = case i of 
     ClassInst ty bind es -> 
@@ -373,6 +377,7 @@ instanceToLean i = case i of
     EmptyID -> "Instance not implemented"
 
 
+-- for multi-word types
 addParenToType :: String -> String
 addParenToType x = 
     let ws = words x 
@@ -384,6 +389,7 @@ findListType [] = []
 findListType [x] = [x]
 findListType (x : y : xs) = 
     if x == "List" then ("(" ++ x ++ " " ++ y ++ ")") : findListType xs else x : findListType (y : xs)
+
 ---------------------------------------------------------------
 ---------------------------------------------------------------
 
@@ -395,23 +401,16 @@ processType = \case
     FunVar f -> case f of 
         LRational -> "Float"
         LEither -> "Except"
-        -- LLeft -> "Except.error"
-        -- LRight -> "Except.ok"
         LMaybe -> "Option"
-        -- LJust -> "some"
-        -- LNothing -> "none"
         LAlphaA -> "a"--"α"
         LShow -> "Repr"
         LEq -> "DecidableEq"
         LEmpty -> ""
-        -- _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
     AppTy ty1 ty2 -> processType ty1 ++ " " ++ processType ty2
-        -- let p1 = processType1
     ExpListTy l -> "[" ++ intercalate ", " (map processType l) ++ "]"
     ListTy t -> "List " ++ processType t
     ParaTy t -> "(" ++ processType t ++ ")"
-    -- _ -> "Type not implemented"
     EmptyT -> "Type Not Implemented"
 
 
@@ -422,8 +421,6 @@ processFunType = getFunTypeList
 
 getFunTypeList :: [Types] -> [String]
 getFunTypeList =  map processType
-
-
 
 
 
@@ -468,10 +465,6 @@ getConPattDetails x = case x of
 
 {- Functions for Exprs -}
 
-{-
-unzipBindTyList :: [(String, String)] -> [String]
-unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
--}
 
 processExprs :: Exprs -> String 
 processExprs = \case 
@@ -491,7 +484,7 @@ processExprs = \case
         let ex1 = processExprs e1 
             ex2 = processExprs e2 
         in ex1 ++ " " ++ ex2
-    OperApp e1 o e2 -> -- processExprs e1 ++ " " ++ processExprs o ++ " " ++ processExprs e2 
+    OperApp e1 o e2 -> 
         let oper = processExprs o 
         in if oper == ":" then processExprs e1 ++ " " ++ "::" ++ " " ++ processExprs e2 else 
             if oper == "." then processExprs e1 ++  " ∘ " ++ processExprs e2 else 
@@ -499,11 +492,9 @@ processExprs = \case
                 processExprs e1 ++ " " ++  oper ++ " " ++ processExprs e2 
     ParaExpr e -> "(" ++ processExprs e ++ ")"
     LetExpr bind exp -> 
-        -- let bndrs = unzipLocBindsToBinds (processLocBindsToLean bind)
         let bndrs = removeEmptyStrFromList $ lines (processLocBindsToLean bind)
             exps = processExprs exp
         in unlines ( map ("let "++)  bndrs )++ "(" ++ exps ++ ")"
-        -- in show bndrs ++ " " ++ "\n\t(" ++ exps ++ ")"
     CaseExpr e mp -> 
         let ex = processExprs e 
             caseBod = map matchpairToLeanWithToString mp
@@ -512,18 +503,20 @@ processExprs = \case
     IfExpr e1 e2 e3 -> "if " ++ processExprs e1 ++ " then " ++ processExprs e2 ++ " else " ++ processExprs e3
     ExpList es -> "[" ++ intercalate ", " (map processExprs es) ++ "]"
     Litr l -> processLits l
-    -- If 
-    -- Par 
-    -- Explicit Tuple
     _ -> "Expr not implemented"
 
-
+{-
+Stmts for Do Exprs
+LetStmt not implemented
+-}
 processStmts :: Stmts -> String 
 processStmts s = case s of 
     BodyStmts e -> processExprs e 
     BindStmts p e -> processPatt p ++ " <- " ++ processExprs e 
     EmptyS -> "Empty Stmt"
     _ -> "Stmts Not Implemented"
+
+
 
 {-
 Removes empty strings from list to prevent extra newlines
@@ -696,33 +689,4 @@ removeTrailingWhitespace
 
 removeTrailingWhitespace :: String -> String 
 removeTrailingWhitespace = reverse . dropWhile (== ' ') . reverse
--- removeTrailingWhitespace x = intercalate "" (words x)
-
-
-findCustomFunTypes :: [AST] -> [String]
-findCustomFunTypes [] = []
-findCustomFunTypes (x : xs) = case x of 
-    SignatureD s -> case s of 
-        TySig _ _ ft _ -> 
-            let c = findCustomFunTy ft 
-            in c ++ findCustomFunTypes xs 
-        _ -> [] 
-    _ -> []
-
-
-findCustomFunTy :: FunType -> [String]
-findCustomFunTy [] = []
-findCustomFunTy (x : xs) = case x of 
-    TypeVar s -> 
-        if s `notElem` builtInTypes then s : findCustomFunTy xs else findCustomFunTy xs 
-    _ -> []
-
-
-builtInTypes :: [String]
-builtInTypes = ["Integer", "Int", "Float", "Bool", "Maybe", "Either", "a"]
-
-
--- 
---
-{- Helper functions -}
 

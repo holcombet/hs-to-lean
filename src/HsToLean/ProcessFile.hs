@@ -50,7 +50,7 @@ sorting the HsDecls list after their translation into the intermediate AST.
           We made the intermediate AST because we want to link type TypeSig with FunBind 
           to extract the parameter names. 
 
-sortDeclList sorts the list of HsDecls (or, in our case, Decls) so that 
+    sortDeclList sorts the list of HsDecls (or, in our case, Decls) so that 
 
 -}
 
@@ -82,10 +82,6 @@ emptyPatts = VariPatt "Patts Not Implemented"
 
 emptyMatchPair :: MatchPair 
 emptyMatchPair = MP {bound_var = [], guard_body = EmptyG}
-
-
-
-
 
 
 
@@ -268,7 +264,7 @@ intermediateTypes = \case
     HsFunTy _ _ arg1 arg2 -> 
         let typList = (unXRec @(GhcPass 'Parsed) arg1) : extractArgs (unXRec @(GhcPass 'Parsed) arg2)
         in FType (map intermediateTypes typList)
-    HsTyVar _ _ typ -> --TypeVar (occNameString . occName . unLoc $ typ)
+    HsTyVar _ _ typ -> 
         let var = (occNameString . occName . unLoc $ typ)
         in intermediateDecideTypes var
     HsAppTy _ typ1 typ2 -> AppTy (intermediateTypes $ unLoc typ1) (intermediateTypes $ unLoc typ2)
@@ -289,11 +285,7 @@ intermediateDecideTypes :: String -> Types
 intermediateDecideTypes x 
     | x == "Rational" = FunVar LRational
     | x == "Either" = FunVar LEither 
-    -- | x == "Left" = FunVar LLeft 
-    -- | x == "Right" = FunVar LRight 
     | x == "Maybe" = FunVar LMaybe 
-    -- | x == "Just" = FunVar LJust 
-    -- | x == "Nothing" = FunVar LNothing 
     | x == "a" = FunVar LAlphaA
     | x == "Show" = FunVar LShow
     | x == "Eq" = FunVar LEq
@@ -412,14 +404,13 @@ Guards (GRHSs, GRHS, etc...) for function body (and other things)
 intermediateGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> GuardRHSs
 intermediateGRHSs (GRHSs _ grhss binds) = 
     let sb = map intermediateGRHS grhss 
-        -- bndr = EmptyLocBinds         -- TODO: implement LocalBinds
         bndr = intermediateLocBinds binds 
     in Guards {guard_exprs = sb, loc_binds = bndr}
 
 
 intermediateGRHS :: LGRHS GhcPs (LHsExpr GhcPs) -> GuardRHS 
 intermediateGRHS (L _ (GRHS _ guardStmt body)) = 
-    let guardStmts = if null guardStmt then [] else intermediateGuardStmts guardStmt      -- implement Stmts 
+    let guardStmts = if null guardStmt then [] else intermediateGuardStmts guardStmt      
         exprStr = intermediateLExpr body 
     in StmtBody {guard_stmt = guardStmts, guard_expr =  exprStr}
 
@@ -431,7 +422,6 @@ intermediateGuardStmts stms = map intermediateGuardStmt stms
 intermediateGuardStmt :: GuardLStmt GhcPs -> Stmts 
 intermediateGuardStmt (L _ stmt) = case stmt of 
     BodyStmt _ expr _ _ -> BodyStmts (intermediateLExpr expr)
-    LetStmt _ binds -> EmptyS 
     BindStmt _ pat expr -> EmptyS 
     _ -> EmptyS
 
@@ -468,6 +458,7 @@ intermediateLMatch :: LMatch GhcPs (LHsExpr GhcPs) -> MatchPair
 intermediateLMatch (L _ match) = case match of 
     Match _ _ pats body -> MP (map intermediatePatts pats) (intermediateGRHSs body)
         
+
 ---------------------------------------------------------------------
 ---------------------------------------------------------------------
 
@@ -736,7 +727,6 @@ generateVarNamesExcluding
 generateVarNamesExcluding :: Int -> [String] -> [String]
 generateVarNamesExcluding n exclude = take n $ filter (`notElem` exclude) $ map toName [0..]
   where
-    -- Convert a number to a variable name
     toName :: Int -> String
     toName x
       | x < 26    = [alphabet !! x]

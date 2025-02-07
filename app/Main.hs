@@ -34,28 +34,8 @@ import System.Directory (doesFileExist)
 
 
 
-import HsToLean.TranslateHaskell (translateToLean)
-import HsToLean.SimpleAST (generateSimpleAST)
 import HsToLean.ProcessFile (getIntermediateAST, generateIntermediateAST, showIntermediateAST)
 import HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs)
-import HsToLean.ASTToHaskell (astListToHaskell, astToHaskell)
-
--- import TestAST 
-
-import StructureAst (structAst)
-import HaskellToHaskell (translateHaskellToHaskell)
-
-
-
-
-prettyPrint :: String -> String
-prettyPrint = unlines . snd . foldl processChar (0, []) where
-    processChar (indent, lines) char
-        | char == '{' = (indent + 1, lines ++ [replicate indent ' ' ++ [char]])
-        | char == '}' = (indent - 1, lines ++ [replicate (indent - 1) ' ' ++ [char]])
-        | otherwise = if null lines
-                      then (indent, [[char]])
-                      else (indent, init lines ++ [last lines ++ [char]])
 
 
 
@@ -64,14 +44,14 @@ main = do
 
   args <- getArgs
 
-  let defaultTargetFile = "examples/TestFunctions.hs"     
+  let defaultTargetFile = "examples/HeapSort.hs"     
 
   let userTargetFile = if not (null args) && (length args) == 1 then head args else defaultTargetFile 
   fileExists <- doesFileExist userTargetFile 
 
   if fileExists 
     then liftIO $ putStrLn "Translating file..."
-    else liftIO $ putStrLn "Invalid file or file path. Translating default file: examples/TestFunctions.hs"
+    else liftIO $ putStrLn "Invalid file or file path. Translating default file: examples/HeapSort.hs"
       
 
 
@@ -90,26 +70,19 @@ main = do
 
       let astForLean = pm_parsed_source parsedModule      -- makes ParsedSource object, used for all translation modules
       
-
       ----
-      liftIO $ generateIntermediateAST astForLean         -- generate intermediate AST and write to file (reference file)
+
+
 
       let interAST = findASTPairs (getIntermediateAST astForLean)   -- make (intermediate) AST object 
       
       liftIO $ putStrLn "\n\n"
-      liftIO $ writeFile "LeanResult.lean" (intercalate "\n\n" (astListToLean interAST))    -- translate AST to lean and write to file
+      let fileName = "LeanOutputs/" ++ (getModuleName $ hsmodName $ unLoc astForLean) ++ ".lean"
+      liftIO $ writeFile fileName (intercalate "\n\n" (astListToLean interAST))
 
-      -----
 
-      {-
-      Following lines are for generating resources for testing and debugging
-      -}
-      liftIO $ writeFile "AST.txt" (gshow astForLean)                 -- printing ghc-lib-parser ast to file
-      liftIO $ structAst "AST.txt"                                    -- generate & write structured ast to file
 
-      -- liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
-      liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
 
-      -- liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
-      -- liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
-
+getModuleName :: Maybe (LocatedA ModuleName) -> String
+getModuleName Nothing = ""
+getModuleName (Just (L _ moduleName)) = moduleNameString moduleName

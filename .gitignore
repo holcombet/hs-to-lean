@@ -7,13 +7,15 @@ output.txt
 .env
 
 # output files
-LeanResult.lean
 AST.txt
 hs_structured_AST.txt 
 intermediateAST.txt 
 astToHaskellTranslation.txt 
-
 astToHaskellTranslation.hs 
+
+
+# .lean output files
+LeanOutputs/*
 
 
 
