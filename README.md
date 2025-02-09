@@ -16,9 +16,12 @@ Additionally, our ADT is structured in a way that is not necessarily specific to
 
 ## Related Works
 
-This project is inspired by the work of Antal Spector-Zabusky, Joachim Breitner, Christine Rizkallah, and Stephanie Weirich in their paper [Total Haskell is Reasonable Coq](https://arxiv.org/abs/1711.09286). Their compiler can be found [here](https://github.com/plclub/hs-to-coq).
+This project is inspired by the work of Antal Spector-Zabusky, Joachim Breitner, Christine Rizkallah, and Stephanie Weirich in their paper ["Total Haskell is Reasonable Coq"](https://arxiv.org/abs/1711.09286). Their compiler can be found [here](https://github.com/plclub/hs-to-coq).
 
-
+### Other relevant work:
+* Abel et al.'s  ["Verifying haskell programs using constructive type theory"](https://dl.acm.org/doi/10.1145/1088348.1088355) (2005) translated Haskell programs into (a monadic form of) Agda using GHC's Core language. 
+* Carr et al.'s ["An approach to translating Haskell programs to
+Agda and reasoning about them"](https://arxiv.org/abs/2205.08718) (2022) extended Agda's capabilities to support Haskell features that Agda originally lacks, allowing translations from Haskell to Agda to be more semantically similar.
 
 
 ## Dependencies
@@ -47,7 +50,7 @@ cabal build
 cabal run hs-to-lean <filepath> 
 ```
 
-### The examples directory
+### The `examples` directory
 Pre-existing, testable Haskell programs can all be found in the `examples` directory.  All files intended for translation should be in the `examples` directory. All filepaths entered during compilation should be of the format `examples/...`
 
 
