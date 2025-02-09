@@ -122,6 +122,7 @@ data SVar
     | VTrue 
     | VFalse
     | VShow
+    | VFoldr
     | EmptyV 
     deriving (Eq, Show)
 data LocBinds 

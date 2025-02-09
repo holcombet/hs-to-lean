@@ -640,6 +640,7 @@ intermediateDecideExpr x
     | x == "show" = SpecialVar VShow
     | x == "True" = SpecialVar VTrue 
     | x == "False" = SpecialVar VFalse
+    | x == "foldr" = SpecialVar VFoldr
     | otherwise = Var x
 
 

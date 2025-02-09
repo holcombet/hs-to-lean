@@ -32,7 +32,7 @@ sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
             funTyList = processFunType funTy        -- parameter types
-            retTy = last funTyList                  -- return type
+            retTy = if null funTyList then [] else last funTyList                  -- return type
             isValBind = length funTyList == 1
             specialCase = containsCase funBind 
         in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
@@ -50,7 +50,7 @@ function that types funtypes and funbinds and returns function arguments in lean
 getBoundVar :: FunType -> Binds -> String
 getBoundVar funTy funBind = thing
     where 
-        listTys = init (processFunType funTy)
+        listTys = if null funTy then [] else init (processFunType funTy)
         listBinds = case funBind of
             FBind name args match ->  args 
             _ -> []
@@ -100,7 +100,7 @@ for instance binds (because it works differently)
 instanceBindsToLean :: Binds -> String 
 instanceBindsToLean = \case 
     FBind name a e -> 
-        let var = if a == [""] && length e > 1 then generateVarNames (1) else a 
+        let var = if a == [""] && length e > 1 then generateVarNames (1)  else a 
             ms = if length e == 1 then map singleMatchPairToLean e else  map matchpairToLean e 
         in name ++ " " ++ unwords var ++ " := " ++ (if length e > 1 then "\nmatch " ++ intercalate ", " var ++ " with\n" ++ unlines (map ("| "++) ms) else unlines ms)
     _ -> "Instance Binding not implemented"
@@ -479,6 +479,7 @@ processExprs = \case
         VPi -> "3.14159"
         VTrue -> "true"
         VFalse -> "false"
+        VFoldr -> "List.foldr"
         _ -> "Special Expr Not Implemented"
     App e1 e2 -> 
         let ex1 = processExprs e1 
