@@ -25,4 +25,5 @@ LeanOutputs/*.lean
 examples/*
 !examples/*.hs
 !examples/**/
+!examples/README.md
 
