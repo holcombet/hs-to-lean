@@ -36,7 +36,7 @@ import GHC.Base (String)
 import Data.Kind (FUN)
 import System.IO
 
-import TestAST
+import AST
 import HsToLean.ASTToLean
 
 

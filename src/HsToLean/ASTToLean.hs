@@ -3,7 +3,7 @@
 
 module HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs) where 
 
-import TestAST
+import AST
 
 import Data.List (intercalate)
 
