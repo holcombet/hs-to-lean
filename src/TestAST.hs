@@ -186,6 +186,7 @@ data Types
     | ExpListTy [Types]
     | ListTy Types
     | ParaTy Types
+    | TupleTy [Types]
     | EmptyT        -- placeholder
     deriving (Eq, Show)
 

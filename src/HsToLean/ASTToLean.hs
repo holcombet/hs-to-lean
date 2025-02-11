@@ -412,6 +412,7 @@ processType = \case
     ListTy t -> "List " ++ processType t
     ParaTy t -> "(" ++ processType t ++ ")"
     -- _ -> "Type not implemented"
+    TupleTy tys -> "(" ++ intercalate "," (map processType tys) ++ ")"
     EmptyT -> "Type Not Implemented"
 
 

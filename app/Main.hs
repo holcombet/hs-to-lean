@@ -97,8 +97,8 @@ main = do
       let interAST = findASTPairs (getIntermediateAST astForLean)   -- make (intermediate) AST object 
       
       liftIO $ putStrLn "\n\n"
-      liftIO $ writeFile "LeanResult.lean" (intercalate "\n\n" (astListToLean interAST))    -- translate AST to lean and write to file
-
+      let fileName = "LeanOutputs/" ++ (getModuleName $ hsmodName $ unLoc astForLean) ++ ".lean"
+      liftIO $ writeFile fileName (intercalate "\n\n" (astListToLean interAST))
       -----
 
       {-
@@ -113,3 +113,6 @@ main = do
       -- liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
       -- liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
 
+getModuleName :: Maybe (LocatedA ModuleName) -> String
+getModuleName Nothing = ""
+getModuleName (Just (L _ moduleName)) = moduleNameString moduleName

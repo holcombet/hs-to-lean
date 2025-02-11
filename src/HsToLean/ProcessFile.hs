@@ -272,10 +272,13 @@ intermediateTypes = \case
         let var = (occNameString . occName . unLoc $ typ)
         in intermediateDecideTypes var
     HsAppTy _ typ1 typ2 -> AppTy (intermediateTypes $ unLoc typ1) (intermediateTypes $ unLoc typ2)
+        -- let t1 = intermediateTypes $ unLoc typ1 
+        -- in if t1 == "IO" then EmptyT else AppTy t1 (intermediateTypes $ unLoc typ2)
     HsExplicitListTy _ _ ls -> ExpListTy (map intermediateTypes (map unLoc ls))
     HsListTy _ typ -> ListTy (intermediateTypes (unLoc typ))
     HsParTy _ typ -> ParaTy (intermediateTypes (unLoc typ))
     HsTyLit _ t -> TypeVar "TyLit"
+    HsTupleTy _ sorted tys -> TupleTy (map intermediateTypes (map unLoc tys))       -- might have to do something with the sorted part...
     _ -> EmptyT
 
 

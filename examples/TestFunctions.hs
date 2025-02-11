@@ -117,7 +117,7 @@ data DayOfWeek
 
 
 
-
+-- main :: IO ()
 main = do 
   print $ calculateArea 2
   putStrLn "Hello World!"
