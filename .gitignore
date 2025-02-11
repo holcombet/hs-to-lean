@@ -15,7 +15,9 @@ astToHaskellTranslation.hs
 
 
 # .lean output files
-LeanOutputs/*.lean
+LeanOutputs/Simple.lean
+LeanOutputs/TestFunctions.lean
+
 
 
 
