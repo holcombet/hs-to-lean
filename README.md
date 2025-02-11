@@ -2,7 +2,7 @@
 
 This is a project by Tally Holcombe for her Master's in Electrical Engineering and Computer Science Thesis at Chapman University. This repo is a work-in-progress, and is not expected to be completed until after her program is completed in May of 2025.
 
-The purpose of this project is to convert Haskell programs to its equivalent Lean code.
+The purpose of this project is to convert Haskell programs to their equivalent Lean code.
 
 
 ## Description
