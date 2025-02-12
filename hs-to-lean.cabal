@@ -22,12 +22,13 @@ maintainer:         74029138+holcombet@users.noreply.github.com
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules: TestAST
+    exposed-modules: AST
                     , HsToLean.TranslateHaskell
                     , HsToLean.SimpleAST
                     , HsToLean.ProcessFile
                     , HsToLean.ASTToLean
                     , HsToLean.ASTToHaskell
+                    , HsToLean.ASTToCoq
                     , StructureAst
                     , HaskellToHaskell
 

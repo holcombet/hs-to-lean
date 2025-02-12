@@ -16,6 +16,15 @@ astToHaskellTranslation.txt
 astToHaskellTranslation.hs 
 
 LeanOutputs/*.lean
+CoqOutputs/
+
+
+src/HsToLean/ASTToCoq.hs
+
+# src/HsToLean/SimpleAST.hs 
+# src/HsToLean/TranslateHaskell.hs 
+
+
 
 
 
