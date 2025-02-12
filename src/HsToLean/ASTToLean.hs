@@ -11,7 +11,6 @@ module HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs) where
 import AST
 
 import Data.List (intercalate)
--- import qualified GHC.Data.ShortText as T
 
 
 
@@ -32,11 +31,11 @@ sigToLean :: Sigs -> String
 sigToLean = \case
     TySig tyName qualTy funTy funBind -> 
         let boundVar = getBoundVar funTy funBind
-            funTyList = processFunType funTy        -- parameter types
+            isQT = (length funTy == 1) && isQualTy (head funTy)
+            funTyList = if isQT then map processType (removeFType (getQualTyTypes (head funTy))) else  processFunType funTy        -- parameter types
             retTy = last funTyList      -- return type
             isValBind = length funTyList == 1
             specialCase = containsCase funBind 
-        -- in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ (if isValBind   then valBindsToLean tyName funBind else bindsToLean funBind) 
         in  "def " ++ tyName ++ " " ++ boundVar ++ " : " ++ retTy ++ " := \n" ++ bindsToLean funBind
     ClassSigs isDefault names sigTy -> 
         let d = if isDefault then "default" else "" 
@@ -47,6 +46,62 @@ sigToLean = \case
     _ -> "Not Implemented"
 
 
+-- function that takes the funtypes and funbinds and returns the lean code of
+-- the function arguments (e.g. (a : Int))
+getBoundVar :: FunType -> Binds -> String
+getBoundVar funTy funBind = thing
+    where 
+
+        isQT = (length funTy == 1) && isQualTy (head funTy)
+        tys
+            | null funTy = []
+            | length funTy == 1 && isQT
+            = map processType (removeFType (getQualTyTypes (head funTy)))
+            | otherwise = init (processFunType funTy)
+
+
+        instTy = if isQT then getQTContext (head funTy) else []
+
+        listBinds = case funBind of
+            FBind name args match ->  args 
+            _ -> []
+
+        pairedLists = zip listBinds tys 
+        thing = (if null instTy then "" else unwords instTy) ++ " " ++  unwords (unzipBindTyList pairedLists)
+
+
+-- helper functions for getBoundVar (unzipBindTyList, processType, processFunType,
+                                --   processPatt, processPattArgs)
+unzipBindTyList :: [(String, String)] -> [String]
+unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
+
+isQualTy :: Types -> Bool 
+isQualTy = \case 
+    QualTy c t -> True 
+    _ -> False
+
+
+getQualTyTypes :: Types -> Types 
+getQualTyTypes = \case 
+    QualTy c t -> t 
+    _ -> EmptyT
+
+
+getQTContext :: Types -> [String] 
+getQTContext = \case 
+    QualTy c t -> map generateInstanceArgument c 
+    _ -> []
+
+
+generateInstanceArgument :: Types -> String 
+generateInstanceArgument x = "[" ++ processType x ++ "]"
+
+
+removeFType :: Types -> [Types]
+removeFType (FType typs) = typs 
+removeFType x = [x]
+
+
 -- functions for value binding functions
 getFirstTy :: Types -> String
 getFirstTy = \case 
@@ -55,7 +110,6 @@ getFirstTy = \case
 
 valBindsToLean :: String -> Binds -> String 
 valBindsToLean ty bind = case bind of 
-    -- FBind name args match -> ty ++ if not (null args) then " " ++ intercalate ", " ( args) else ""  ++ " = " ++ unlines (map matchpairToLean match)  -- intercalate ", " match  -- body not finished... but at least it's something
     FBind name args match -> 
         let bod = (map getConstantFunBody match)  
         in if length bod == 1 then unlines bod else bindsToLean bind
@@ -67,7 +121,6 @@ valBindsToLean ty bind = case bind of
 implicitBindsToLean :: Binds -> String 
 implicitBindsToLean = \case 
     FBind name args match -> 
-        -- if length match == 1  then unlines ( map singleMatchPairToLean match)
         "def " ++ name ++ " " ++ unwords args ++ " := " ++ unlines (map singleMatchPairToLean match)
     _ -> ""
 
@@ -75,7 +128,6 @@ implicitBindsToLean = \case
 bindsToLean :: Binds -> String
 bindsToLean = \case
     FBind name args match -> 
-        -- if length match == 1 && mpNotCaseExpr (head match) then unlines ( map singleMatchPairToLean match)
         if length match == 1 && not (mpContainsCase (head match)) then unlines ( map singleMatchPairToLean match)
         else 
             let matchStmt = "match " ++ intercalate ", " ( args) ++ " "  ++ "with\n"
@@ -83,14 +135,10 @@ bindsToLean = \case
             in matchStmt  ++ intercalate "" (map removeTrailingWhitespace matches)
     _ -> ""
        
--- mpNotCaseExpr :: MatchPair -> Bool 
--- mpNotCaseExpr (MP _ bod) = case bod of 
---     Guards e _ -> case e of 
---         [StmtBody _ ex] -> case ex of 
---             CaseExpr _ _ -> True 
---             _ -> False 
---         _ -> False
---     _ -> False
+
+
+
+
 
 
 
@@ -216,15 +264,14 @@ guardRHSsToLean = \case
             bndr =  processLocBindsToLean loc
             guardBody = if last guardEnd == "else" then unlines (init guards) ++  unwords (init guardEnd) else unlines guards
         in " => " ++ guardBody ++ (if bndr == "" then "" else "where\n" ++ bndr)
-        -- in " => " ++ (if last guardEnd == "else" then unlines (init guards) ++  unwords (init guardEnd) else unlines guards) ++ (if bndr == "" then "" else "where\n\t" ++ bndr)
-        -- in " => " ++ unlines guards ++ if bndr == "" then "" else "\n"
+
     
 guardRHSToLean :: GuardRHS -> String 
 guardRHSToLean (StmtBody sm epr) = 
-    let guardStmts = if null sm then "" else --if null sm then " => " else --"Lean Guards not Implemented"
+    let guardStmts = if null sm then "" else 
             let stm = guardStmtsToLean sm 
             in "\n" ++ if null stm ||  stm == "" then "" else stm ++ " then "
-        exprStr = if null sm then processExprs epr else --"Lean Guards Not Implemented"
+        exprStr = if null sm then processExprs epr else 
             let ex = processExprs epr 
             in if guardStmts == "" then ex else ex ++ " else"
     in guardStmts ++ exprStr
@@ -340,27 +387,6 @@ formatConTy tempVar conVar = zipWith (\s1 s2 -> "(" ++ s1 ++ " : " ++ s2 ++ ")")
 
 
 
--- function that takes the funtypes and funbinds and returns the lean code of
--- the function arguments (e.g. (a : Int))
-getBoundVar :: FunType -> Binds -> String
-getBoundVar funTy funBind = thing
-    where 
-        listTys = if null funTy then [] else init (processFunType funTy)
-        listBinds = case funBind of
-            FBind name args match ->  args 
-            -- FBind name args match -> if args == [""] then generateVarNames (length listTys) else args 
-            _ -> []
-
-        -- returnTy = last listTys
-        -- argty = init listTys
-        pairedLists = zip listBinds listTys 
-        thing = unwords (unzipBindTyList pairedLists)
-
-
--- helper functions for getBoundVar (unzipBindTyList, processType, processFunType,
-                                --   processPatt, processPattArgs)
-unzipBindTyList :: [(String, String)] -> [String]
-unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
 
 
 
@@ -411,16 +437,18 @@ processType = \case
         LEmpty -> ""
         -- _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
-    AppTy ty1 ty2 -> -- processType ty1 ++ " " ++ processType ty2
+    AppTy ty1 ty2 -> 
         let p1 = processType ty1 
             p2 = processType ty2 
         in handleSpecialAppTy p1 p2
     ExpListTy l -> "[" ++ intercalate ", " (map processType l) ++ "]"
     ListTy t -> "List " ++ processType t
     ParaTy t -> "(" ++ processType t ++ ")"
-    -- _ -> "Type not implemented"
     TupleTy tys -> "(" ++ intercalate "," (map processType tys) ++ ")"
+    QualTy typs ty -> unwords (map generateInstanceArgument typs) ++ " " ++ unwords (getFunTypeList (removeFType ty))
     EmptyT -> "Type Not Implemented"
+
+
 
 
 
@@ -436,6 +464,7 @@ handleSpecialAppTy :: String -> String -> String
 handleSpecialAppTy x y 
     | x == "IO" = "IO Unit"
     | otherwise = x ++ " " ++ y
+
 
 
 
@@ -494,16 +523,16 @@ processExprs = \case
         VPrint -> "IO.print"
         VJust -> "some"
         VNothing -> "none"
-        VShow -> "toString"
+        VShow -> "repr"
         VPi -> "3.14159"
         VTrue -> "true"
         VFalse -> "false"
         _ -> "Special Expr Not Implemented"
     App e1 e2 -> 
         let ex1 = processExprs e1 
-            ex2 = processExprs e2 
+            ex2 = processExprs e2
         in ex1 ++ " " ++ ex2
-    OperApp e1 o e2 -> -- processExprs e1 ++ " " ++ processExprs o ++ " " ++ processExprs e2 
+    OperApp e1 o e2 ->  
         let oper = processExprs o 
         in if oper == ":" then processExprs e1 ++ " " ++ "::" ++ " " ++ processExprs e2 else 
             if oper == "." then processExprs e1 ++  " ∘ " ++ processExprs e2 else 
@@ -511,15 +540,14 @@ processExprs = \case
                 processExprs e1 ++ " " ++  oper ++ " " ++ processExprs e2 
     ParaExpr e -> "(" ++ processExprs e ++ ")"
     LetExpr bind exp -> 
-        -- let bndrs = unzipLocBindsToBinds (processLocBindsToLean bind)
         let bndrs = removeEmptyStrFromList $ lines (processLocBindsToLean bind)
             exps = processExprs exp
         in unlines ( map ("let "++)  bndrs )++ "(" ++ exps ++ ")"
-        -- in show bndrs ++ " " ++ "\n\t(" ++ exps ++ ")"
     CaseExpr e mp -> 
         let ex = processExprs e 
             caseBod = map matchpairToLeanWithToString mp
-        in "match " ++ (if head (words ex) == "toString" then "(" ++ ex ++ ").data" else ex) ++ " with\n" ++ unlines (map ("| "++) caseBod)
+        
+        in "match " ++ (if head (words ex) == "repr" then "(" ++ "toString " ++ unwords (tail (words ex)) ++ ").data" else ex) ++ " with\n" ++ unlines (map ("| "++) caseBod)
     DoExprs s -> "do\n" ++ unlines (map ("    "++) (map processStmts s))
     IfExpr e1 e2 e3 -> "if " ++ processExprs e1 ++ " then " ++ processExprs e2 ++ " else " ++ processExprs e3
     ExpList es -> "[" ++ intercalate ", " (map processExprs es) ++ "]"
@@ -536,6 +564,8 @@ processStmts s = case s of
     BindStmts p e -> processPatt p ++ " <- " ++ processExprs e 
     EmptyS -> "Empty Stmt"
     _ -> "Stmts Not Implemented"
+
+
 
 {-
 Removes empty strings from list to prevent extra newlines
@@ -734,7 +764,15 @@ builtInTypes :: [String]
 builtInTypes = ["Integer", "Int", "Float", "Bool", "Maybe", "Either", "a"]
 
 
+isVShow :: Exprs -> Bool 
+isVShow = \case 
+    SpecialVar x -> case x of 
+        VShow -> True 
+        _ -> False 
+    _ -> False
 -- 
 --
 {- Helper functions -}
 
+-- toFunType :: Types -> FunType 
+-- toFunType x = FunType

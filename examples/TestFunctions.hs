@@ -103,10 +103,10 @@ circleArea radius = piVal * radiusSquared
     radiusSquared = radius * radius 
 
 -- test case keyword -- requires partial def
--- pad :: Int -> String
--- pad day = case show day of
---     [c] -> [' ', c]
---     cs  -> cs
+pad :: Int -> String
+pad day = case show day of
+    [c] -> [' ', c]
+    cs  -> cs
 
 
 
@@ -115,7 +115,11 @@ data DayOfWeek
     deriving (Show, Eq, Enum, Bounded)
 
 
-
+printList :: Show a => [a] -> IO ()
+printList [] = putStrLn "Empty list"
+printList (x:xs) = do
+    putStrLn (show x)
+    printList xs
 
 main :: IO ()
 main = do 

@@ -187,6 +187,11 @@ data Types
     | ListTy Types
     | ParaTy Types
     | TupleTy [Types]
+    | QualTy 
+        {
+            qual_context :: [Types],            -- typeclass qualifiers
+            qual_types :: Types
+        }
     | EmptyT        -- placeholder
     deriving (Eq, Show)
 

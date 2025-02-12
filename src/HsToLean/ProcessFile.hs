@@ -263,6 +263,7 @@ removeFunTy = \case
     ExpListTy l -> [ExpListTy l]
     FunVar f -> [FunVar f]
     ParaTy p -> [ParaTy p]
+    QualTy ts t -> [QualTy ts t]
     EmptyT -> []
 
 
@@ -282,7 +283,19 @@ intermediateTypes = \case
     HsParTy _ typ -> ParaTy (intermediateTypes (unLoc typ))
     HsTyLit _ t -> TypeVar "TyLit"
     HsTupleTy _ sorted tys -> TupleTy (map intermediateTypes (map unLoc tys))       -- might have to do something with the sorted part...
+    HsQualTy _ context typ -> 
+        let c = intermediateHsContext context 
+            t = intermediateTypes (unLoc typ)
+        in QualTy {qual_context = c, qual_types = t}
     _ -> EmptyT
+
+
+{-
+Extract list of context for type signatures
+-}
+intermediateHsContext :: LHsContext GhcPs -> [Types]
+intermediateHsContext (L _ context) = map (intermediateTypes . (unXRec @(GhcPass 'Parsed))) context
+
 
 
 {-
