@@ -1,9 +1,14 @@
 
 {-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns, OverloadedStrings #-}
 
+
+{-
+This module linearizes our intermediate AST into Lean code
+-}
+
 module HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs) where 
 
-import TestAST
+import AST
 
 import Data.List (intercalate)
 -- import qualified GHC.Data.ShortText as T
@@ -340,7 +345,7 @@ formatConTy tempVar conVar = zipWith (\s1 s2 -> "(" ++ s1 ++ " : " ++ s2 ++ ")")
 getBoundVar :: FunType -> Binds -> String
 getBoundVar funTy funBind = thing
     where 
-        listTys = init (processFunType funTy)
+        listTys = if null funTy then [] else init (processFunType funTy)
         listBinds = case funBind of
             FBind name args match ->  args 
             -- FBind name args match -> if args == [""] then generateVarNames (length listTys) else args 
@@ -406,8 +411,10 @@ processType = \case
         LEmpty -> ""
         -- _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
-    AppTy ty1 ty2 -> processType ty1 ++ " " ++ processType ty2
-        -- let p1 = processType1
+    AppTy ty1 ty2 -> -- processType ty1 ++ " " ++ processType ty2
+        let p1 = processType ty1 
+            p2 = processType ty2 
+        in handleSpecialAppTy p1 p2
     ExpListTy l -> "[" ++ intercalate ", " (map processType l) ++ "]"
     ListTy t -> "List " ++ processType t
     ParaTy t -> "(" ++ processType t ++ ")"
@@ -425,6 +432,10 @@ getFunTypeList :: [Types] -> [String]
 getFunTypeList =  map processType
 
 
+handleSpecialAppTy :: String -> String -> String 
+handleSpecialAppTy x y 
+    | x == "IO" = "IO Unit"
+    | otherwise = x ++ " " ++ y
 
 
 

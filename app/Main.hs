@@ -39,6 +39,7 @@ import HsToLean.SimpleAST (generateSimpleAST)
 import HsToLean.ProcessFile (getIntermediateAST, generateIntermediateAST, showIntermediateAST)
 import HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs)
 import HsToLean.ASTToHaskell (astListToHaskell, astToHaskell)
+import HsToLean.ASTToCoq (astListToCoq, astToCoq)
 
 -- import TestAST 
 
@@ -101,6 +102,10 @@ main = do
       liftIO $ writeFile fileName (intercalate "\n\n" (astListToLean interAST))
       -----
 
+      -- translation to coq
+      -- let fileNameCoq = "CoqOutputs/" ++ (getModuleName $ hsmodName $ unLoc astForLean) ++ ".txt"
+      -- liftIO $ writeFile fileNameCoq (intercalate "\n\n" (astListToCoq interAST))
+
       {-
       Following lines are for generating resources for testing and debugging
       -}
@@ -110,6 +115,7 @@ main = do
       -- liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
       liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
 
+      -- Translation from AST to Haskell
       -- liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
       -- liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
 

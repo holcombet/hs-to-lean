@@ -1,23 +1,18 @@
 {-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns, OverloadedStrings #-}
 
+{-
+This module takes the intermediate AST and linearizes it back into Haskell code
+
+This module helps measure and test for the correct level of abstraction from our AST
+-}
 
 module HsToLean.ASTToHaskell (astListToHaskell, astToHaskell) where 
 
-import TestAST
+import AST
 
 import Data.List (intercalate)
 
-{-
-astListToLean :: [AST] -> [String]
-astListToLean = map astToLean 
 
-astToLean :: AST -> String 
-astToLean = \case 
-    SignatureD s -> sigToLean s 
-    ValueD v -> implicitBindsToLean v 
-    TyClassD t -> tyClToLean t 
-    _ -> ""
--}
 
 astListToHaskell :: [AST] -> [String]
 astListToHaskell = map astToHaskell 

@@ -1,7 +1,10 @@
 {-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns, OverloadedStrings #-}
 
 {-
-Module for processing the ghc-lib-parser AST into the intermediate ADT structure.
+Module for processing the ghc-lib-parser AST into the intermediate ADT structure 
+declared in src/AST.hs.
+
+Returns AST data structure
 -}
 
 module HsToLean.ProcessFile (generateIntermediateAST, getIntermediateAST, showIntermediateAST) where 
@@ -36,7 +39,7 @@ import GHC.Base (String)
 import Data.Kind (FUN)
 import System.IO
 
-import TestAST
+import AST
 import HsToLean.ASTToLean
 
 
