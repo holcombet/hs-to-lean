@@ -1,7 +1,7 @@
 
 {-# LANGUAGE PackageImports, CPP, TypeApplications, DataKinds, LambdaCase, ViewPatterns, OverloadedStrings #-}
 
-module TestAST where
+module AST where
 
 import Data.List (intercalate)
 import System.IO
