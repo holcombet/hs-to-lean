@@ -19,10 +19,13 @@ LeanOutputs/*.lean
 CoqOutputs/
 
 
-src/HsToLean/ASTToCoq.hs
+src/HaskellToHaskell.hs 
+src/StructureAST.hs 
 
-# src/HsToLean/SimpleAST.hs 
-# src/HsToLean/TranslateHaskell.hs 
+src/HsToLean/ASTToCoq.hs
+src/HsToLean/SimpleAST.hs 
+src/HsToLean/TranslateHaskell.hs 
+src/HsToLean/SimpleAST.hs
 
 
 
