@@ -28,7 +28,7 @@ src/HsToLean/TranslateHaskell.hs
 src/HsToLean/SimpleAST.hs
 
 
-
+examples/HelloWorld.hs 
 
 
 
