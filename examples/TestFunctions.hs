@@ -10,7 +10,15 @@ frac = 1 / 2
 -- Examples of SynDecls
 type Name = String      -- no QualTy, Type only
 
-type ResultFunction a b = a -> Either String b      -- QualTy and function
+type Result a b = a -> Either String b      -- QualTy and function
+
+type Transform = Int -> Int
+
+type Numbers = [Int]
+
+sumNumbers :: Numbers -> Int
+sumNumbers [] = 0
+sumNumbers (x:xs) = x + sumNumbers xs
 
 -- data declarations
 data Something a b = Blah a | Bleh b        -- data : QualTy and alternating application to constructors
@@ -59,8 +67,7 @@ categorizeNumber :: Int -> String
 categorizeNumber x
   | x < 0     = "Negative"
   | x == 0    = "Zero"
-  | x < 10    = "Small"
-  | otherwise = "Large"
+  | otherwise = "Positive"
 
 -- Test let keyword
 calculateArea :: Float -> Float
@@ -108,6 +115,12 @@ pad day = case show day of
     [c] -> [' ', c]
     cs  -> cs
 
+printList :: Show a => [a] -> IO ()
+printList [] = putStrLn "Empty list"
+printList (x:xs) = do
+    putStrLn (show x)
+    printList xs
+
 
 
 data DayOfWeek
@@ -115,11 +128,7 @@ data DayOfWeek
     deriving (Show, Eq, Enum, Bounded)
 
 
-printList :: Show a => [a] -> IO ()
-printList [] = putStrLn "Empty list"
-printList (x:xs) = do
-    putStrLn (show x)
-    printList xs
+
 
 main :: IO ()
 main = do 

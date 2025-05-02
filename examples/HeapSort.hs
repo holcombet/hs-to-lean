@@ -21,3 +21,6 @@ heapSort = tree2list . heapify
 main = do
     print $ heapSort [5,2,8,1,3,7,9]
     print $ heapSort [9,7,3,1,8,2,5]
+
+    -- let tree1 = Node 5 Nil Nil
+    -- print $ isElemTree 5 tree1

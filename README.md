@@ -1,8 +1,8 @@
 # hs-to-lean
 
-This is a project by Tally Holcombe for her Master's in Electrical Engineering and Computer Science Thesis at Chapman University. This repo is a work-in-progress, and is not expected to be completed until after her program is completed in May of 2025.
+This is a project by Tally Holcombe for her Master's in Electrical Engineering and Computer Science thesis at Chapman University. This repo is a work-in-progress, and is not expected to be completed until *after* her program is finished in May of 2025.
 
-The purpose of this project is to convert Haskell programs to its equivalent Lean code.
+The purpose of this project is to convert Haskell programs to its equivalent Lean code, encouraging efforts in program verification.
 
 
 ## Description
@@ -87,10 +87,8 @@ This compiler currently consists of four main components:
 ## Notable Limitations
 
 At present, this tool can translate only a fragment of Haskell. The following list contains some of the notable limitations to this compiler:
-* **Using typeclasses**: Only the Eq and Show typeclasses are supported by this compiler at present
-    * Type class constraints in type signatures (e.g. `Eq a =>` in `someFunc :: Eq a => a -> b -> Bool`) is not currently supported, but is expected to be implemented soon.
-* **The IO a monad** (from [Prelude](https://hackage.haskell.org/package/base-4.21.0.0/docs/Prelude.html#t:IO)), specifically for type signatures, is not supported. 
-    * Haskell type signatures that use the IO monad, e.g. the main function, must have an implicit type signature for proper translation to Lean
+* **Using typeclasses**: Only Haskell's `Eq` and `Show` typeclasses (`BEq` and `Repr` in Lean) are supported by this compiler at present
+    * Translation of qualified types in type signatures (e.g. `Eq a =>` in `someFunc :: Eq a => a -> b -> Bool`) is implemented, but not yet fully supported or tested. 
 * **Language extensions**: This tool does not support features provided by [language extentions](https://hackage.haskell.org/package/template-haskell-2.23.0.0/docs/Language-Haskell-TH.html#g:5).
 * **Library Imports**: This compiler does not yet support importing libraries. All programs must be supported exclusively by Haskell's built-in libraries.
 * **Naming conflicts**: This compiler does not implement a renamer, and it is sensitive to naming conventions from the Haskell source code. This compiler is capable of creating rudimentary variable names that were implicitly typed in the original Haskell code, but it cannot identify or rename variables that conflict with Lean's syntax.

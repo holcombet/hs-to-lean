@@ -128,7 +128,8 @@ implicitBindsToLean = \case
 bindsToLean :: Binds -> String
 bindsToLean = \case
     FBind name args match -> 
-        if length match == 1 && not (mpContainsCase (head match)) then unlines ( map singleMatchPairToLean match)
+        -- if length match == 1 && not (mpContainsCase (head match)) then unlines ( map singleMatchPairToLean match)
+        if length match == 1 then unlines ( map singleMatchPairToLean match)
         else 
             let matchStmt = "match " ++ intercalate ", " ( args) ++ " "  ++ "with\n"
                 matches = (map ("| " ++) (map matchpairToLean match))

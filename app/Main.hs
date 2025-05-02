@@ -112,7 +112,7 @@ main = do
       liftIO $ writeFile "AST.txt" (gshow astForLean)                 -- printing ghc-lib-parser ast to file
       liftIO $ structAst "AST.txt"                                    -- generate & write structured ast to file
 
-      -- liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
+      liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
       liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
 
       -- Translation from AST to Haskell
