@@ -15,7 +15,6 @@ astToHaskellTranslation.txt
 
 astToHaskellTranslation.hs 
 
-LeanOutputs/*.lean
 CoqOutputs/
 
 
