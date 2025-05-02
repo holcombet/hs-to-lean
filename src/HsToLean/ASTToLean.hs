@@ -427,16 +427,11 @@ processType = \case
     FunVar f -> case f of 
         LRational -> "Float"
         LEither -> "Except"
-        -- LLeft -> "Except.error"
-        -- LRight -> "Except.ok"
         LMaybe -> "Option"
-        -- LJust -> "some"
-        -- LNothing -> "none"
         LAlphaA -> "a"--"α"
         LShow -> "Repr"
         LEq -> "DecidableEq"
         LEmpty -> ""
-        -- _ -> "FunType not "
     FType typs -> intercalate " -> " (map processType typs)     -- for actual function applications (arrows)
     AppTy ty1 ty2 -> 
         let p1 = processType ty1 
@@ -510,11 +505,6 @@ getConPattDetails x = case x of
 
 {- Functions for Exprs -}
 
-{-
-unzipBindTyList :: [(String, String)] -> [String]
-unzipBindTyList = map (\(x, y) -> "(" ++ x ++ " : " ++ y ++ ")")
--}
-
 processExprs :: Exprs -> String 
 processExprs = \case 
     Var x -> x 
@@ -528,6 +518,8 @@ processExprs = \case
         VPi -> "3.14159"
         VTrue -> "true"
         VFalse -> "false"
+        VFoldr -> "List.foldr"
+        VFoldl -> "List.foldl"
         _ -> "Special Expr Not Implemented"
     App e1 e2 -> 
         let ex1 = processExprs e1 
