@@ -21,7 +21,6 @@ data Sigs
     =   TySig 
             {
                 ty_name :: String,
-                -- outer_tyvar_bndrs :: OuterTypeVarBndr, -- TODO: figure out OuterTypeVarBndr
                 qual_ty ::  Context,
                 fun_type :: FunType,
                 fun_bind :: Binds
@@ -39,10 +38,6 @@ data Sigs
 type Context = [Types]
 type FunType = [Types]
 
--- data SigTys = SigTys OuterSigBndrs Types 
---     deriving (Eq, Show)
-
--- type OuterSigBndrs = String 
 
 
 data InstDecls 
@@ -66,17 +61,12 @@ data Binds
     deriving (Eq, Show)
 
 
--- data MatchPair = MP {bound_var :: [Patts], guard_body :: GuardRHSs}
---     deriving (Eq, Show)
 
 
--- temp for testing
 data MatchPair = MP {bound_var :: [Patts], guard_body :: GuardRHSs}
     deriving (Eq, Show)
 
--- data GuardRHSs = GuardRHSs {guard_stmt :: [Stmts], guard_expr :: Exprs, loc_binds :: LocBinds}
---                 | EmptyG
---     deriving (Eq, Show)
+
 
 data GuardRHSs = Guards {guard_exprs :: [GuardRHS], loc_binds :: LocBinds}
                 | EmptyG 
@@ -122,6 +112,8 @@ data SVar
     | VPi
     | VTrue 
     | VFalse
+    | VFoldr 
+    | VFoldl
     | EmptyV 
     deriving (Eq, Show)
 data LocBinds 
@@ -198,15 +190,11 @@ data Types
 data FVar 
     = LRational     
     | LEither
-    -- | LLeft 
-    -- | LRight
     | LMaybe
     | LAlphaA
-    -- | LJust
-    -- | LNothing
     | LShow         -- typeclass
     | LEq           -- typeclass 
-    | LEmpty   -- placeholder
+    | LEmpty        -- placeholder
     deriving (Eq, Show)
 data Patts 
     = EmptyP

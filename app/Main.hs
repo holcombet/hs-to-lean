@@ -41,8 +41,6 @@ import HsToLean.ASTToLean (astListToLean, astToLean, findASTPairs)
 import HsToLean.ASTToHaskell (astListToHaskell, astToHaskell)
 import HsToLean.ASTToCoq (astListToCoq, astToCoq)
 
--- import TestAST 
-
 import StructureAst (structAst)
 import HaskellToHaskell (translateHaskellToHaskell)
 
@@ -65,18 +63,16 @@ main = do
 
   args <- getArgs
 
-  let defaultTargetFile = "examples/TestFunctions.hs"     
+  let defaultTargetFile = "examples/HeapSort.hs"     
 
   let userTargetFile = if not (null args) && (length args) == 1 then head args else defaultTargetFile 
   fileExists <- doesFileExist userTargetFile 
 
   if fileExists 
     then liftIO $ putStrLn "Translating file..."
-    else liftIO $ putStrLn "Invalid file or file path. Translating default file: examples/TestFunctions.hs"
+    else liftIO $ putStrLn "Invalid file or file path. Translating default file: examples/HeapSort.hs"
       
 
-
-  
 
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
@@ -102,22 +98,7 @@ main = do
       liftIO $ writeFile fileName (intercalate "\n\n" (astListToLean interAST))
       -----
 
-      -- translation to coq
-      -- let fileNameCoq = "CoqOutputs/" ++ (getModuleName $ hsmodName $ unLoc astForLean) ++ ".txt"
-      -- liftIO $ writeFile fileNameCoq (intercalate "\n\n" (astListToCoq interAST))
-
-      {-
-      Following lines are for generating resources for testing and debugging
-      -}
-      liftIO $ writeFile "AST.txt" (gshow astForLean)                 -- printing ghc-lib-parser ast to file
-      liftIO $ structAst "AST.txt"                                    -- generate & write structured ast to file
-
-      liftIO $ putStrLn $ unlines $ showIntermediateAST interAST   -- show intermediate AST structure
-      liftIO $  translateHaskellToHaskell astForLean               -- show HaskellToHaskell translation
-
-      -- Translation from AST to Haskell
-      -- liftIO $ writeFile "astToHaskellTranslation.txt" (intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean))
-      -- liftIO $ writeFile "astToHaskellTranslation.hs" ("module ASTToHaskellTranslation where\n\n" ++ intercalate "\n" (astListToHaskell $ getIntermediateAST astForLean)) 
+      
 
 getModuleName :: Maybe (LocatedA ModuleName) -> String
 getModuleName Nothing = ""
