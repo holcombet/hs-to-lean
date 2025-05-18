@@ -1,6 +1,8 @@
 # hs-to-lean
 
-This is a project by Tally Holcombe for her Master's in Electrical Engineering and Computer Science thesis at Chapman University. This repo is a work-in-progress, and is not expected to be completed until *after* her program is finished in May of 2025.
+This is a project by Tally Holcombe for her Master's in Electrical Engineering and Computer Science thesis at Chapman University. This repo is a work-in-progress, and is not expected to be completed until *after* her program is finished in May of 2025. 
+
+Future work includes extending this compiler during her doctoral program at Chapman University.
 
 The purpose of this project is to convert Haskell programs to its equivalent Lean code, encouraging efforts in program verification.
 
